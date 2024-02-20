@@ -311,6 +311,7 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str):
 
     # update hybrid toplogy
     pdb_filepath = f"{name}_hybrid.pdb"
+    print("writing hybrid topology to: {pdb_filepath}")
     traj = md.Trajectory(min_coordinates.value_in_unit(unit.nanometer), hybrid_topology)
     modified_traj = traj.atom_slice(hybrid_topology.select("all"))
 
@@ -318,9 +319,12 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str):
     modified_traj.save_pdb(pdb_filepath)
 
     # solvate
+    print("solvating...")
     pdb = PDBFixer(filename=pdb_filepath)
     pdb.addSolvent(boxSize=Vec3(30,30,30)*unit.angstrom)
+    print("writing solvated hybrid topology to: {pdb_filepath}")
     PDBFile.writeFile(pdb.topology, pdb.positions, open(f'{name}_hybrid_solv.pdb', 'w'))
 
-# to generate a hybrid structure and solvate (eg. for acetylacetone and the corresponding enol form):
-#save_solv_pdb(name="acetylacetone", smiles_t1="CC(CC(C)=O)=O", smiles_t2="CC(/C=C(/C)\O)=O")
+if __name__ == "__main__":
+    # generate a hybrid structure and solvate (eg. for acetylacetone and the corresponding enol form):
+    save_solv_pdb(name="acetylacetone", smiles_t1="CC(CC(C)=O)=O", smiles_t2="CC(/C=C(/C)\O)=O")
