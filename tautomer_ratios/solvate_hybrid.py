@@ -27,6 +27,7 @@ from openmm.app import PDBFile
 from openmm.vec3 import Vec3
 from PIL import Image
 from io import BytesIO
+import yaml
 
 #visualize both tautomers
 #indexing starts at 1, as in the corresponding PDB file written by save_solv_pdb()
@@ -73,7 +74,7 @@ def visualize_tautomers(m1, m2, name):
     composed_image.paste(img1, (0, 0))
     composed_image.paste(img2, (img1.width, 0))
 
-    plt.savefig(f"{name}.png")
+    plt.savefig(f"../testing/{name}/{name}.png")
     plt.close()  
     
 def get_coordinates(m):
@@ -310,7 +311,8 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str):
                                           heavy_atom_hydrogen_donor_idx=heavy_atom_hydrogen_donor_idx)
 
     # update hybrid toplogy
-    pdb_filepath = f"{name}_hybrid.pdb"
+    
+    pdb_filepath = f"../testing/{name}/{name}_hybrid.pdb"
     print("writing hybrid topology...")
     traj = md.Trajectory(min_coordinates.value_in_unit(unit.nanometer), hybrid_topology)
     modified_traj = traj.atom_slice(hybrid_topology.select("all"))
@@ -322,9 +324,19 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str):
     print("solvating...")
     pdb = PDBFixer(filename=pdb_filepath)
     pdb.addSolvent(boxSize=Vec3(30,30,30)*unit.angstrom)
-    PDBFile.writeFile(pdb.topology, pdb.positions, open(f'{name}_hybrid_solv.pdb', 'w'))
+    PDBFile.writeFile(pdb.topology, pdb.positions, open(f'../testing/{name}/{name}_hybrid_solv.pdb', 'w'))
     print("writing solvated hybrid topology...")
 
 if __name__ == "__main__":
+
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+
+    name = config["tautomer_systems"]["name"]
+    smiles_t1 = config["tautomer_systems"]["smiles_t1"]
+    smiles_t2 = config["tautomer_systems"]["smiles_t2"]
+
+    if not os.path.exists(f"../testing/{name}"):
+        os.makedirs(f"../testing/{name}")
     # generate a hybrid structure and solvate (eg. for acetylacetone and the corresponding enol form):
-    save_solv_pdb(name="acetylacetone", smiles_t1="CC(CC(C)=O)=O", smiles_t2="CC(/C=C(/C)\O)=O")
+    save_solv_pdb(name=name, smiles_t1=smiles_t1, smiles_t2=smiles_t2)

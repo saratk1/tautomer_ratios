@@ -1,0 +1,11 @@
+sim_control_params:
+  n_samples: 10
+  n_steps_per_sample: 10
+  nnp: "tautani2x"
+  lambda_val: 0
+
+tautomer_systems:
+  name: "acetylacetone"
+  smiles_t1: "CC(CC(C)=O)=O"
+  smiles_t2: "CC(/C=C(/C)\\O)=O"
+  dG: 1.132369 
