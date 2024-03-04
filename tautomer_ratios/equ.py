@@ -16,10 +16,10 @@ from openmm import MonteCarloBarostat
 from openmmtools.constants import kB
 from openmmtools.forces import FlatBottomRestraintBondForce
 import os
-from sys import stdout
+#from sys import stdout
 import torch 
-import sys
-import openmm
+#import sys
+#import openmm
 import yaml
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
