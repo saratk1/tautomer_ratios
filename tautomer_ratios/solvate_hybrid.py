@@ -8,13 +8,13 @@ import numpy as np
 import random
 from typing import List
 import copy
-from collections import defaultdict
+#from collections import defaultdict
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdFMCS
 from rdkit.Chem import Draw
-from rdkit.Chem.Draw import IPythonConsole
+#from rdkit.Chem.Draw import IPythonConsole
 from rdkit.Chem.Draw import rdMolDraw2D
-from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms, CalcNumRotatableBonds, CalcNumAtoms
+#from rdkit.Chem.rdMolDescriptors import CalcNumHeavyAtoms, CalcNumRotatableBonds, CalcNumAtoms
 import matplotlib.pyplot as plt
 from openmm import unit
 import torch
@@ -119,17 +119,17 @@ def find_idx(m1: int, m2: int):
         atoms += str(a.GetSymbol())
 
         if a.GetIdx() not in substructure_idx_m1:
-            print("not in MCS:", a.GetIdx()+1)
+            print("Atom index not in MCS:", a.GetIdx()+1)
             print("Index of atom that moves: {}.".format(a.GetIdx()+1))
             hydrogen_idx_that_moves = a.GetIdx()
-            print("check element that moves:" ,a.GetSymbol())
+            print("Check element that moves:" ,a.GetSymbol())
 
     # get idx of connected heavy atom which is the donor atom
     # there can only be one neighbor, therefor it is valid to take the first neighbor of the hydrogen
     donor = int(
         m1.GetAtomWithIdx(hydrogen_idx_that_moves).GetNeighbors()[0].GetIdx()
     )
-    print("Index of atom that donates hydrogen: {}".format(donor+1))
+    print("Index of atom (tautomer 1) that donates hydrogen: {}".format(donor+1))
     print("Element: ", m1.GetAtomWithIdx(hydrogen_idx_that_moves).GetNeighbors()[0].GetSymbol())
 
     # get idx of acceptor atom
@@ -148,7 +148,7 @@ def find_idx(m1: int, m2: int):
                     continue
                 acceptor = substructure_idx_m1[i]
                 print(
-                    "Index of atom that accepts hydrogen: {}".format(acceptor+1)
+                    "Index of atom that accepts hydrogen (tautomer 1): {}".format(acceptor+1)
                 )
                 acceptor_count += 1
                 if acceptor_count > 1:
@@ -228,9 +228,11 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str):
     m2 = Chem.AddHs(mol2)
 
     # visualize tautomers with atom indices
+    print("Generating representation of tautomer 1 and tautomer 2...")
     visualize_tautomers(m1, m2, name)
 
     # get indices 
+    print("Finding indices of donor, acceptor and hydrogen that moves...")
     heavy_atom_hydrogen_donor_idx, heavy_atom_hydrogen_acceptor_idx, hydrogen_idx = find_idx(m1, m2)
 
     # get hybrid atom numbers as a string
@@ -240,6 +242,7 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str):
     ligand_topology = get_topology(m1)
 
     # define ANI model
+    print("Define ANI model...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = torchani.models.ANI2x(periodic_table_index=True).to(device)
 
@@ -250,6 +253,7 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str):
     min_e = 100.0 * unit.kilojoule_per_mole
     min_coordinates = []
 
+    print("Find coordinates of dummy atom...")
     for _ in range(100):
 
         # get coordinates of acceptor atom and hydrogen that moves
