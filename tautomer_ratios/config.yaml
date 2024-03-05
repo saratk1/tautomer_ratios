@@ -3,6 +3,7 @@ sim_control_params:
   n_steps_per_sample: 10
   nnp: "tautani2x"
   lambda_val: 0
+  nr_lambda_states: 2
 
 tautomer_systems:
   name: "acetylacetone"
