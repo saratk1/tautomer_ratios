@@ -73,6 +73,9 @@ def visualize_tautomers(m1, m2, name):
     composed_image = Image.new('RGB', (img1.width + img2.width, max(img1.height, img2.height)))
     composed_image.paste(img1, (0, 0))
     composed_image.paste(img2, (img1.width, 0))
+    
+    if not os.path.exists(f"../testing/{name}"):
+        os.makedirs(f"../testing/{name}")
 
     plt.savefig(f"../testing/{name}/{name}.png")
     plt.close()  
