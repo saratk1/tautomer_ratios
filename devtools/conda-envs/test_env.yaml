@@ -1,20 +1,24 @@
-name: test
+name: taut_diff_test
 channels:
-
   - conda-forge
-
-  - defaults
+  - pytroch
+  - nvidia
 dependencies:
     # Base depends
-  - python
+  - python=3.11
   - pip
 
-    # Testing
+  - openmm=8.1.0
+  - openmm-torch 
+  - openmmtools 
+  - pytorch-cuda=11.8 
+  - pytorch 
   - pytest
-  - pytest-cov
-  - codecov
+  - rdkit
+  - mdtraj
+  - tqdm
 
     # Pip-only installs
-  #- pip:
-  #  - codecov
-
+  - pip:
+    - git+https://github.com/sef43/torchani.git@patch_openmmml_issue50
+    - git+https://github.com/saratk1/openmm-ml-taut.git
