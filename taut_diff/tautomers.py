@@ -5,10 +5,12 @@
 # so that they match indexing in the PDB file
 
 import numpy as np
+import sys
 import random
 import copy
 import torch
 import os
+import yaml
 from typing import List
 
 from rdkit import Chem
@@ -221,6 +223,36 @@ def sample_spherical(acceptor:str, ndim=3):
                             acceptor_hydrogen_equilibrium_bond_length) 
     return (unit_vector * effective_bond_length)
 
+def add_connect(pdb_filepath: str, hybrid_topology):
+    # write correct CONECT record in pdb
+
+    with open(pdb_filepath, 'r') as f:
+        lines = f.readlines()
+
+    new_lines = []
+
+    for line in lines:
+        if line.startswith('CONECT'):
+            continue
+        new_lines.append(line)
+
+    sorted_bonds = []
+    for bond in hybrid_topology.bonds:
+        atom1_index = bond[0].index + 1  # PDB atom indices start from 1
+        atom2_index = bond[1].index + 1  
+        sorted_bonds.append((atom1_index, atom2_index))
+
+    for atom1_index, atom2_index in sorted_bonds:
+        new_lines.append(f'CONECT {atom1_index:>4}{atom2_index:>4}\n')
+
+    # remove old END
+    new_lines = [line for line in new_lines if not line.strip() == 'END']
+    # add new END
+    new_lines.append('END\n')
+
+    with open(f"{pdb_filepath}", 'w') as f:
+        f.writelines(new_lines)
+
 def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
 
     # generate rdkit molecule objects
@@ -326,6 +358,8 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
     #Save the modified trajectory with updated topology
     modified_traj.save_pdb(pdb_filepath)
 
+    add_connect(pdb_filepath=pdb_filepath, hybrid_topology=hybrid_topology)
+
     # solvate
     print("solvating...")
     pdb = PDBFixer(filename=pdb_filepath)
@@ -341,3 +375,18 @@ def get_indices(tautomer: str, ligand_topology,device) :
     indices = torch.tensor([1 if atom.name == {"t1": "D2", "t2": "D1"}.get(tautomer) else 0 for atom in ligand_topology.atoms()])
     indices = indices.bool()
     return indices
+
+if __name__ == "__main__":
+
+    with open(sys.argv[1], 'r') as file:
+        config = yaml.safe_load(file)
+
+    name = config["tautomer_systems"]["name"]
+    smiles_t1 = config["tautomer_systems"]["smiles_t1"]
+    smiles_t2 = config["tautomer_systems"]["smiles_t2"]
+    base = config["base"]
+
+    if not os.path.exists(f"{base}/{name}"):
+        os.makedirs(f"{base}/{name}")
+    # generate a hybrid structure and solvate (eg. for acetylacetone and the corresponding enol form):
+    save_solv_pdb(name=name, smiles_t1=smiles_t1, smiles_t2=smiles_t2, base=base)
