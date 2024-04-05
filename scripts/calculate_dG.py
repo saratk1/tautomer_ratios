@@ -20,6 +20,10 @@ import mdtraj as md
 from pymbar import MBAR
 from taut_diff.equ import calculate_u_kn
 
+print("\n")
+print("############################################################")
+print("Free energy calculation")
+print("############################################################ \n")
 
 # get system information and simulation parameters
 config_path = sys.argv[2] # path to config.yaml file
@@ -42,11 +46,11 @@ lambs = np.linspace(0, 1, nr_lambda_states)
 solv_system=app.PDBFile(f'{base}/{name}/{name}_hybrid_solv.pdb')
 system_topology = solv_system.getTopology()
 
-print("Loading samples...")
+print(f"Loading samples for {name}...")
 trajs = []
 for lambda_val in lambs:
     traj = md.load_dcd(
-            f"{base}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
+            f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
             top=f"{base}/{name}/{name}_hybrid_solv.pdb", # also possible to use the tmp.pdb
         )
     trajs.append(traj)
@@ -62,7 +66,7 @@ N_k, u_kn = calculate_u_kn(
     device=device,
     device_index=device_index,
     discard_frames=discard_frames,
-    every_nth_frame=30,
+    every_nth_frame=10,
     )
 
 # initialize the MBAR maximum likelihood estimate
