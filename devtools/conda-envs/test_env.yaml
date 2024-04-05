@@ -1,7 +1,7 @@
 name: taut_diff_test
 channels:
   - conda-forge
-  - pytroch
+  - pytorch
   - nvidia
 dependencies:
     # Base depends
