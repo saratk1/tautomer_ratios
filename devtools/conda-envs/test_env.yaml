@@ -6,14 +6,13 @@ channels:
 dependencies:
     # Base depends
   - python=3.11
-  - pip
 
   - openmm=8.1.0
   - openmm-torch 
   - openmmtools 
   - pytorch-cuda=11.8 
   - pytorch 
-  - pytest
+  #- pytest
   - rdkit
   - mdtraj
   - tqdm
