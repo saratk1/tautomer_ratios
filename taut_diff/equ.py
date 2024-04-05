@@ -96,7 +96,7 @@ def _collect_equ_samples(
     print(f"Will discard {discard_frames} samples from the beginning of the trajectory (20%) and take only every {every_nth_frame}th frame...")
     # loop over lambda scheme and collect samples in nanometer
     for idx, traj in enumerate(trajs):
-        print(f"Processing trajectory {idx+1}/{len(trajs)}")     
+        print(f"Loading trajectory {idx+1}/{len(trajs)}")     
         xyz=traj.xyz
         xyz = xyz[discard_frames:]  # remove first 20%
         xyz = xyz[::every_nth_frame]  # take only every nth sample
