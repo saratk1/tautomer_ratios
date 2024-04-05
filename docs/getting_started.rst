@@ -25,14 +25,12 @@ Here is an example to of a :code:`config.yaml` to generate samples for the first
 .. code:: yaml
 
     base: "../testing" # base directory for output files
-    write_pdb: True # specify if creating PDB file is necessary
     sim_control_params:
         n_samples: 100 # number of samples to generate
         n_steps_per_sample: 50 # number of steps between each sample
         nnp: "tautani2x" # name of the NNP 
         lambda_val: 0 # lambda value (0 == tautomer 1; 1 == tautomer 2)
-        nr_lambda_states: 1 # number of lambda states (currently each lambda state has to be run seperately; this will be changed)
-
+        nr_lambda_states: 1 # number of lambda states 
     tautomer_systems: # test system from the Tautobase
         name: "acetylacetone"
         smiles_t1: "CC(CC(C)=O)=O"
@@ -40,18 +38,19 @@ Here is an example to of a :code:`config.yaml` to generate samples for the first
         dG: 1.132369 # experimental value in kcal/mol
     
 An equilibrium simulation can be run with :code:`python run_equ_sim.py 0 config.yaml`. The first argument specifies the device index of the GPU, the second one gives the path to the :code:`config.yaml` file.
-This script will first create a PDB file of the solvated (30x30x30 A box) tautomer system (if ``write_pdb: True``). Afterwards, a 5 ps test-simulation will be run (currently each lambda state has to be run seperately; this will be changed).
+This script will first create a PDB file of the solvated (30x30x30 A box) tautomer system (if ``write_pdb: True``). Afterwards, a 5 ps test-simulation will be run.
+If ``nr_lambda_states: 1``, only one simulation will be run for ``lambda_val: 0``. If ``nr_lambda_states: 8``, eight simulations will be run for (for `lambda = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]`).
 
 2. Visualization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To visualize the samples generated in the equilibrium simulation, the :code:`vis.py` script can be used. This script takes the same :code:`config.yaml` file as input and wraps each frame of the trajectory. The output is saved as a new `.dcd` file.
+To visualize the samples generated in the equilibrium simulation, the :code:`vis.py` script can be used. This script takes the same :code:`config.yaml` file as input and wraps each frame of either one or all provided trajectories. The output is saved as a new `.dcd` file.
 
 3. Free energy estimation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After running a series of equilibrium simulations (e.g. 8 lambda states from 0 to 1), the free energy difference between the two tautomers can be estimated using the :code:`calculate_dG.py` script. 
 To this end, the number of lambda states needs to be specified in the :code:`config.yaml` file (e.g. ``nr_lambda_states: 8``). 
-The script can then be run with :code:`python calculate_dG.py 0 config.yaml`. Again, the first argument specifies the device index of the GPU, the second one gives the path to the config.yaml file.
+The script can then be run with :code:`python calculate_dG.py 0 config.yaml`. Again, the first argument specifies the device index of the GPU, the second one gives the path to the :code:`config.yaml` file.
 The script will read in the samples from the equilibrium simulations, compute the free energy difference between the two tautomers using the `MBAR` estimator, and print the calculated and the experimental result.
 
