@@ -1,13 +1,13 @@
 Getting Started
 ===============
 
-This is a broad overview of how to perform free energy calculations between two tautomers in solution with a neural network potential using this package.
+This is a broad overview of how to calculate the free energy difference between two tautomers in solution with a neural network potential using this package.
 Currently, multistate free energy calculations are supported; this will be extended.
 
 
 Installation
 -----------------
-It is recommended to set up a new python conda environment with :code:`python=3.11` and installing the packages defined `here <https://github.com/saratk1/blob/main/devtools/conda-envs/test_env.yaml>`_ using :code:`mamba`.
+It is recommended to set up a new python conda environment with :code:`python=3.11` and installing the packages defined `here <https://github.com/saratk1/taut_diff/blob/main/devtools/conda-envs/test_env.yaml>`_ using :code:`mamba`.
 This package can be installed using:
 :code:`pip install git+https://github.com/saratk1/taut_diff.git`.
 
