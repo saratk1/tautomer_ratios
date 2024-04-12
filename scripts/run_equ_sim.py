@@ -1,4 +1,4 @@
-# first sys.argv is device index, second specifies the path to the config.yaml file
+# first sys.argv is device index, second specifies the path to the config.yaml file, third specifies the lambda value
 
 import numpy as np
 import os
@@ -26,7 +26,9 @@ smiles_t2 = config["tautomer_systems"]["smiles_t2"]
 base = config["base"]
 n_samples = config['sim_control_params']['n_samples']
 n_steps_per_sample = config['sim_control_params']['n_steps_per_sample']
-lambda_val = config['sim_control_params']['lambda_val']
+lambda_val = int(sys.argv[3])
+print(lambda_val)
+#lambda_val = config['sim_control_params']['lambda_val']
 nr_lambda_states = config['sim_control_params']['nr_lambda_states']
 nnp = config['sim_control_params']['nnp']
 
@@ -88,7 +90,7 @@ for lambda_val in lambs:
     ################################################ data collection setup ###############################################################
 
     # define where to store simulation info
-    statereport_file = f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_report.csv"
+    statereport_file = f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_report.csv" 
     sim.reporters.append(
         StateDataReporter(
             statereport_file,
@@ -105,7 +107,7 @@ for lambda_val in lambs:
         )
     )
     # define where to store samples
-    trajectory_file = f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd"
+    trajectory_file = f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd" 
     sim.reporters.append(
         DCDReporter(
             trajectory_file,
