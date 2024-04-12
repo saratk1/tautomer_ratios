@@ -305,7 +305,7 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
 
         # prepare hybrid coordinates for ANI
         coordinates_tensor = torch.tensor(
-            hybrid_coord.value_in_unit(unit.nanometer),
+            hybrid_coord.value_in_unit(unit.angstrom),
             requires_grad=True,
             device=device,
             dtype=torch.float32,
