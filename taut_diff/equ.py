@@ -25,6 +25,8 @@ def get_sim(system_topology,
     # get indices for t1 and t2 that should be masked (with -1)
     t1_idx_mask = get_indices(tautomer="t1", ligand_topology=system_topology, device=device)
     t2_idx_mask = get_indices(tautomer="t2", ligand_topology=system_topology, device=device)
+    # print(f"Mask indices for t1: {t1_idx_mask}")
+    # print(f"Mask indices for t2: {t2_idx_mask}")
 
     # create the modified MLPotential (from openmm-ml-taut)
     potential = MLPotential(name=nnp, 
@@ -38,8 +40,8 @@ def get_sim(system_topology,
     )
 
     integrator = LangevinIntegrator(temperature, 1 / collision_rate, stepsize)
-    barostate = MonteCarloBarostat(pressure, temperature)
-    system.addForce(barostate)
+    barostate = MonteCarloBarostat(pressure, temperature) 
+    system.addForce(barostate) 
 
     # add restraints
     if restraints:
@@ -48,16 +50,17 @@ def get_sim(system_topology,
         acceptor_t2 = next((idx for idx, atom in enumerate(system_topology.atoms()) if atom.name == "HET2"), None)
         dummy_t1 = next((idx for idx, atom in enumerate(system_topology.atoms()) if atom.name == "D1"), None)
         dummy_t2 = next((idx for idx, atom in enumerate(system_topology.atoms()) if atom.name == "D2"), None)
+        #print(f"Restraint atom indices: acceptor_t1={acceptor_t1}, dummy_t1={dummy_t1}, acceptor_t2={acceptor_t2}, dummy_t2={dummy_t2}")
 
         # add C-H dummy atom restraint
-        restraint_force_t1 = FlatBottomRestraintBondForce(spring_constant= 100  * unit.kilocalories_per_mole / unit.angstrom**2,
-                                                    well_radius= 2 * unit.angstrom,
+        restraint_force_t1 = FlatBottomRestraintBondForce(spring_constant= 50  * unit.kilocalories_per_mole / unit.angstrom**2,
+                                                    well_radius= 1.5 * unit.angstrom,
                                                     restrained_atom_index1 = acceptor_t1,  
                                                     restrained_atom_index2 = dummy_t1)
-        restraint_force_t2 = FlatBottomRestraintBondForce(spring_constant= 100  * unit.kilocalories_per_mole / unit.angstrom**2,
-                                                    well_radius= 2 * unit.angstrom,
-                                                    restrained_atom_index1 = acceptor_t2,  
-                                                    restrained_atom_index2 = dummy_t2)
+        restraint_force_t2 = FlatBottomRestraintBondForce(spring_constant= 50  * unit.kilocalories_per_mole / unit.angstrom**2,
+                                                    well_radius= 1.5 * unit.angstrom,
+                                                    restrained_atom_index1 = acceptor_t2, 
+                                                    restrained_atom_index2 = dummy_t2) 
         # restraint_force_t1.setUsesPeriodicBoundaryConditions = True
         # restraint_force_t2.setUsesPeriodicBoundaryConditions = True
 
@@ -115,7 +118,7 @@ def calculate_u_kn(
     device,
     device_index,
     discard_frames: int,
-    every_nth_frame: int = 10,  # prune the samples further by taking only every nth sample
+    every_nth_frame: int = 1,  # prune the samples further by taking only every nth sample
 ) -> np.ndarray:
     """
     Calculate the u_kn matrix to be used by the mbar estimator
@@ -123,7 +126,7 @@ def calculate_u_kn(
     Args:
         trajs (list): list of trajectories
         sim (Simulation): simulation object
-        every_nth_frame (int, optional): prune the samples further by taking only every nth sample. Defaults to 2.
+        every_nth_frame (int, optional): prune the samples further by taking only every nth sample. Defaults to 1.
         
     Returns:
         np.ndarray: u_kn matrix
