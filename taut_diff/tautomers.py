@@ -326,7 +326,7 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
         energy_in_hartree = model(
             (
                 batch_species, # batch_species
-                coordinates_tensor)
+                coordinates_tensor) # ANI wants coordinates in angstrom
             ).energies
 
         #  convert energy from hartree to kT
@@ -375,6 +375,39 @@ def get_indices(tautomer: str, ligand_topology,device) :
     indices = torch.tensor([1 if atom.name == {"t1": "D2", "t2": "D1"}.get(tautomer) else 0 for atom in ligand_topology.atoms()])
     indices = indices.bool()
     return indices
+
+def get_atoms_for_restraint(name:str, base:str, tautomer:str):
+    if tautomer == "t1":
+        het_atom = "HET1"
+        dummy_atom = "D1"
+    elif tautomer == "t2":
+        het_atom = "HET2"
+        dummy_atom = "D2"
+
+    tautomer_system = md.load(f"{base}/{name}/{name}_hybrid.pdb")
+    # get topology
+    system_topology = tautomer_system.topology
+    # get indices of dummy atom, atom bound to dummy atom
+    atom_1=next(system_topology.atoms_by_name(dummy_atom)).index
+    atom_2=next(system_topology.atoms_by_name(het_atom)).index
+    # find index of the third atom
+    for bond in system_topology.bonds:
+        # check if atom1 of the bond is the het_atom
+        if bond.atom1.name == het_atom:
+            # check if it is not bound to the corresponding dummy atom and it is not a hydrogen atom
+            if not bond.atom2.name == dummy_atom and bond.atom2.element.symbol != "H":
+                atom_3=bond.atom2.index
+                break
+        # same for if atom2 of the bond is the het_atom
+        elif bond.atom2.name == het_atom:
+            if not bond.atom1.name == dummy_atom and bond.atom1.element.symbol != "H":
+                atom_3 = bond.atom1.index
+                break
+
+    # compute angle between those three atoms
+    angle = md.compute_angles(tautomer_system, [[atom_1, atom_2, atom_3]]) # in radians
+    
+    return atom_1, atom_2, atom_3, angle[0][0]
 
 if __name__ == "__main__":
 
