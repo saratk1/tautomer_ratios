@@ -14,6 +14,7 @@ from openmm import app
 from openmm import Platform
 from taut_diff.tautomers import save_solv_pdb
 from taut_diff.equ import get_sim
+from openmm import unit
 
 # read yaml file
 config_path = sys.argv[2]
@@ -26,7 +27,7 @@ smiles_t2 = config["tautomer_systems"]["smiles_t2"]
 base = config["base"]
 n_samples = config['sim_control_params']['n_samples']
 n_steps_per_sample = config['sim_control_params']['n_steps_per_sample']
-lambda_val = int(sys.argv[3])
+lambda_val = float(sys.argv[3])
 print(lambda_val)
 #lambda_val = config['sim_control_params']['lambda_val']
 nr_lambda_states = config['sim_control_params']['nr_lambda_states']
@@ -35,8 +36,8 @@ nnp = config['sim_control_params']['nnp']
 print("\n")
 # create directory to store results
 if not os.path.exists(f"{base}/{name}"):
-        print("Creating directory:", f"{base}/{name}")
-        os.makedirs(f"{base}/{name}")
+    print("Creating directory:", f"{base}/{name}")
+    os.makedirs(f"{base}/{name}")
 
 print(f"Working directory: {base}/{name}")
 
@@ -79,12 +80,15 @@ for lambda_val in lambs:
     platform = Platform.getPlatformByName("CUDA")  
     device_index = sys.argv[1]
 
-    sim = get_sim(system_topology=system_topology, 
+    sim = get_sim(solv_system=solv_system, 
+                name=name,
+                base=base,
                 nnp=nnp, 
                 lambda_val=lambda_val, 
                 device=device,
                 platform=platform,
-                restraints=True,
+                bond_restraints=True,
+                angle_restraints=True,
                 device_index=device_index)
 
     ################################################ data collection setup ###############################################################
@@ -118,6 +122,12 @@ for lambda_val in lambs:
 
     # set coordinates
     sim.context.setPositions(solv_system.getPositions())
+
+    # get potential energy of initial state (for testing purposes)
+    # initial_state = sim.context.getState(getEnergy=True)  
+    # initial_potential_energy = initial_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
+    # print(f"Initial Potential Energy = {initial_potential_energy} kJ/mol")
+
     # perform sampling
     print(f"Running equilibrium simulation for lambda value={lambda_val:.4f}")
     sim.step(n_samples * n_steps_per_sample)
@@ -125,4 +135,8 @@ for lambda_val in lambs:
     print(f"State report saved to: {statereport_file}")
     print(f"Trajectory saved to: {trajectory_file}")
 
-
+    file_path = f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_DONE.txt"
+    if not os.path.exists(file_path):
+        print("Writing file which marks end of simulation:", file_path)
+        with open(file_path, 'w'):
+            pass  # Just open the file without writing anything
