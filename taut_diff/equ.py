@@ -7,14 +7,18 @@ from openmm import LangevinIntegrator
 from openmm import unit
 from openmm import MonteCarloBarostat
 from openmmtools.forces import FlatBottomRestraintBondForce
-from taut_diff.tautomers import get_indices
+from simtk.openmm import HarmonicAngleForce
+from taut_diff.tautomers import get_indices, get_atoms_for_restraint
 
-def get_sim(system_topology, 
+def get_sim(solv_system, 
+            name: str,
+            base: str,
             nnp:str, 
             lambda_val: float, 
             device, 
             platform, 
-            restraints: bool = False, 
+            bond_restraints: bool = False, 
+            angle_restraints: bool = False,
             device_index: int = 0):
     
     from taut_diff.constant import (temperature, 
@@ -22,6 +26,7 @@ def get_sim(system_topology,
                                     collision_rate, 
                                     stepsize)
     
+    system_topology = solv_system.topology
     # get indices for t1 and t2 that should be masked (with -1)
     t1_idx_mask = get_indices(tautomer="t1", ligand_topology=system_topology, device=device)
     t2_idx_mask = get_indices(tautomer="t2", ligand_topology=system_topology, device=device)
@@ -44,28 +49,20 @@ def get_sim(system_topology,
     system.addForce(barostate) 
 
     # add restraints
-    if restraints:
-        # get indices of heavy atom-H for tautomer 1 and tautomer 2
-        acceptor_t1 = next((idx for idx, atom in enumerate(system_topology.atoms()) if atom.name == "HET1"), None) 
-        acceptor_t2 = next((idx for idx, atom in enumerate(system_topology.atoms()) if atom.name == "HET2"), None)
-        dummy_t1 = next((idx for idx, atom in enumerate(system_topology.atoms()) if atom.name == "D1"), None)
-        dummy_t2 = next((idx for idx, atom in enumerate(system_topology.atoms()) if atom.name == "D2"), None)
-        #print(f"Restraint atom indices: acceptor_t1={acceptor_t1}, dummy_t1={dummy_t1}, acceptor_t2={acceptor_t2}, dummy_t2={dummy_t2}")
+    if bond_restraints:
+            
+        bond_force_t1 = get_bond_restraint(name=name, base=base, tautomer="t1", lambda_val=lambda_val)
+        bond_force_t2 = get_bond_restraint(name=name, base=base, tautomer="t2", lambda_val=lambda_val)
 
-        # add C-H dummy atom restraint
-        restraint_force_t1 = FlatBottomRestraintBondForce(spring_constant= 50  * unit.kilocalories_per_mole / unit.angstrom**2,
-                                                    well_radius= 1.5 * unit.angstrom,
-                                                    restrained_atom_index1 = acceptor_t1,  
-                                                    restrained_atom_index2 = dummy_t1)
-        restraint_force_t2 = FlatBottomRestraintBondForce(spring_constant= 50  * unit.kilocalories_per_mole / unit.angstrom**2,
-                                                    well_radius= 1.5 * unit.angstrom,
-                                                    restrained_atom_index1 = acceptor_t2, 
-                                                    restrained_atom_index2 = dummy_t2) 
-        # restraint_force_t1.setUsesPeriodicBoundaryConditions = True
-        # restraint_force_t2.setUsesPeriodicBoundaryConditions = True
+        system.addForce(bond_force_t1)
+        system.addForce(bond_force_t2)
 
-        system.addForce(restraint_force_t1)
-        system.addForce(restraint_force_t2)
+    if angle_restraints:
+        angle_force_1 = get_angle_restraint(name=name, base=base, tautomer="t1", lambda_val=lambda_val)
+        angle_force_2 = get_angle_restraint(name=name, base=base, tautomer="t2", lambda_val=lambda_val)
+
+        system.addForce(angle_force_1)
+        system.addForce(angle_force_2)
     
     sim = Simulation(
     system_topology, 
@@ -78,6 +75,35 @@ def get_sim(system_topology,
                 },)
     
     return sim
+    
+def get_bond_restraint(name:str, base:str, tautomer: str, lambda_val: float):
+    atom_1, atom_2, _, _ = get_atoms_for_restraint(name=name,  base=base, tautomer=tautomer)
+    if tautomer == "t1":
+        spring_constant = 10 * lambda_val
+    elif tautomer == "t2":
+        spring_constant = 10 * (1 - lambda_val)
+    restraint_force = FlatBottomRestraintBondForce(spring_constant= spring_constant  * unit.kilocalories_per_mole / unit.angstrom**2,
+                                                well_radius= 1.5 * unit.angstrom,
+                                                restrained_atom_index1 = atom_1,  
+                                                restrained_atom_index2 = atom_2)
+    print(f"Restraining the bond between atoms {atom_1+1} and {atom_2+1} for tautomer {tautomer} with a FlatBottomRestraint (with a spring constant of {spring_constant} kcal/mol/A^2 and a well radius of 1.5 A)")
+    return restraint_force
+
+def get_angle_restraint(name:str, base:str, tautomer:str, lambda_val: float):
+    if tautomer == "t1":
+        k = 10 * lambda_val
+    elif tautomer == "t2":
+        k = 10 * (1 - lambda_val)
+    atom_1, atom_2, atom_3, angle = get_atoms_for_restraint(name=name, base=base, tautomer=tautomer)
+    angle_force = HarmonicAngleForce()
+    angle_force.addAngle(particle1=atom_1, 
+                            particle2=atom_2, 
+                            particle3=atom_3, 
+                            angle=angle * unit.radian, 
+                            k=k * unit.kilocalories_per_mole / unit.radian**2) 
+    print(f"Restraining the angle defined by atoms {atom_1+1}, {atom_2+1} and {atom_3+1} ({np.degrees(angle)} degrees) for tautomer {tautomer} with a harmonic angle restraint (with a harmonic force constant of {k} kcal/mole/rad^2)")
+    return angle_force
+
 
 # adapted from https://github.com/wiederm/endstate_correction/blob/63b92ab2b25bd4272fa11c956663f7f70f81a11c/endstate_correction/equ.py
 def _collect_equ_samples(
@@ -111,8 +137,10 @@ def _collect_equ_samples(
 
 def calculate_u_kn(
     trajs: list,  # list of trajectories
-    system_topology,
+    solv_system,
     nnp: str,
+    name: str,
+    base: str,
     nr_lambda_states,
     platform,
     device,
@@ -134,6 +162,7 @@ def calculate_u_kn(
     from taut_diff.constant import kBT
 
     lambda_scheme = np.linspace(0, 1, nr_lambda_states)  # equilibrium lambda scheme
+    lambda_scheme = np.array(lambda_scheme)
     samples, N_k = _collect_equ_samples(trajs=trajs, every_nth_frame=every_nth_frame, discard_frames=discard_frames)  # collect samples
 
     u_kn = np.zeros(
@@ -143,12 +172,15 @@ def calculate_u_kn(
     
     for k, lamb in enumerate(lambda_scheme):
         print("Calculate Us for lambda = {:.1f}".format(lamb))
-        sim = get_sim(system_topology=system_topology, 
+        sim = get_sim(solv_system=solv_system, 
+                      name=name, 
+                      base=base,
                       nnp=nnp, 
                       lambda_val=lamb, 
                       device=device,
                       platform=platform,
-                      restraints=False,
+                      bond_restraints=True, ###### necessary?
+                      angle_restraints=True,
                       device_index=device_index)
         us = []
         for x in tqdm(range(len(samples))):
@@ -166,4 +198,40 @@ def calculate_u_kn(
 
     assert total_nr_of_samples > 20  # make sure that there are samples present
 
+    np.save(f'u_kn_{nr_lambda_states}_{total_nr_of_samples}_{name}.npy', u_kn)
+    np.save(f'N_k_{total_nr_of_samples}_{nr_lambda_states}_{name}.npy', N_k)
+
     return (N_k, u_kn)
+
+def plot_overlap_for_equilibrium_free_energy(
+    N_k: np.array, u_kn: np.ndarray, n_samples: int, n_steps_per_sample: int, name: str
+):
+    """
+    Calculate the overlap for each state with each other state. The overlap is normalized to be 1 for each row.
+
+    Args:
+        N_k (np.array): number of samples for each state k
+        u_kn (np.ndarray): each of the potential energy functions `u` describing a state `k` are applied to each sample `n` from each of the states `k`
+        name (str): name of the system in the plot
+    """
+    from pymbar import MBAR
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    # initialize the MBAR maximum likelihood estimate
+
+    mbar = MBAR(u_kn, N_k)
+    plt.figure(figsize=[8, 8], dpi=300)
+    overlap = mbar.compute_overlap()["matrix"]
+    sns.heatmap(
+        overlap,
+        cmap="Blues",
+        linewidth=0.5,
+        annot=True,
+        fmt="0.2f",
+        annot_kws={"size": "small"},
+    )
+    plt.title(f"Overlap matrix for {name}", fontsize=15)
+    plt.savefig(f"{name}_overlap_samples_{n_samples}_steps_{n_steps_per_sample}.png")
+    plt.show()
+    plt.close()
