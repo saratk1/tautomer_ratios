@@ -31,7 +31,7 @@ with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
 
 name = config["tautomer_systems"]["name"]
-nr_lambda_states = config['sim_control_params']['nr_lambda_states']
+lambs = config['analysis']['lambda_scheme']
 nnp = config['sim_control_params']['nnp']
 n_samples = config['sim_control_params']['n_samples']
 n_steps_per_sample = config['sim_control_params']['n_steps_per_sample']
@@ -42,9 +42,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 platform = Platform.getPlatformByName("CUDA")  
 device_index = sys.argv[1]
 
-lambs = np.linspace(0, 1, nr_lambda_states)
 solv_system=app.PDBFile(f'{base}/{name}/{name}_hybrid_solv.pdb')
-system_topology = solv_system.getTopology()
 
 print(f"Loading samples for {name}...")
 trajs = []
@@ -59,14 +57,16 @@ discard_frames=int((n_samples / 100) * 20) # discard first 20%
 
 N_k, u_kn = calculate_u_kn(
     trajs=trajs,
-    system_topology=system_topology,
+    solv_system=solv_system,
     nnp=nnp,
-    nr_lambda_states=nr_lambda_states,
+    name=name,
+    base=base,
+    lambda_scheme=lambs,
     platform=platform,
     device=device,
     device_index=device_index,
     discard_frames=discard_frames,
-    every_nth_frame=10,
+    every_nth_frame=30,
     )
 
 # initialize the MBAR maximum likelihood estimate

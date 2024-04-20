@@ -86,7 +86,7 @@ def get_bond_restraint(name:str, base:str, tautomer: str, lambda_val: float):
                                                 well_radius= 1.5 * unit.angstrom,
                                                 restrained_atom_index1 = atom_1,  
                                                 restrained_atom_index2 = atom_2)
-    print(f"Restraining the bond between atoms {atom_1+1} and {atom_2+1} for tautomer {tautomer} with a FlatBottomRestraint (with a spring constant of {spring_constant} kcal/mol/A^2 and a well radius of 1.5 A)")
+    print(f"Restraining the bond between atoms {atom_1+1} and {atom_2+1} for tautomer {tautomer} with a flat bottom restraint (with a spring constant of {spring_constant} kcal/mol/A^2 and a well radius of 1.5 A)")
     return restraint_force
 
 def get_angle_restraint(name:str, base:str, tautomer:str, lambda_val: float):
@@ -101,7 +101,7 @@ def get_angle_restraint(name:str, base:str, tautomer:str, lambda_val: float):
                             particle3=atom_3, 
                             angle=angle * unit.radian, 
                             k=k * unit.kilocalories_per_mole / unit.radian**2) 
-    print(f"Restraining the angle defined by atoms {atom_1+1}, {atom_2+1} and {atom_3+1} ({np.degrees(angle)} degrees) for tautomer {tautomer} with a harmonic angle restraint (with a harmonic force constant of {k} kcal/mole/rad^2)")
+    print(f"Restraining the angle defined by atoms {atom_1+1}, {atom_2+1} and {atom_3+1} ({np.degrees(angle):.2f} degrees) for tautomer {tautomer} with a harmonic angle restraint (with a harmonic force constant of {k} kcal/mole/rad^2)")
     return angle_force
 
 
@@ -141,7 +141,7 @@ def calculate_u_kn(
     nnp: str,
     name: str,
     base: str,
-    nr_lambda_states,
+    lambda_scheme,
     platform,
     device,
     device_index,
@@ -161,7 +161,6 @@ def calculate_u_kn(
     """
     from taut_diff.constant import kBT
 
-    lambda_scheme = np.linspace(0, 1, nr_lambda_states)  # equilibrium lambda scheme
     lambda_scheme = np.array(lambda_scheme)
     samples, N_k = _collect_equ_samples(trajs=trajs, every_nth_frame=every_nth_frame, discard_frames=discard_frames)  # collect samples
 
@@ -179,8 +178,8 @@ def calculate_u_kn(
                       lambda_val=lamb, 
                       device=device,
                       platform=platform,
-                      bond_restraints=True, ###### necessary?
-                      angle_restraints=True,
+                      bond_restraints=False,
+                      angle_restraints=False,
                       device_index=device_index)
         us = []
         for x in tqdm(range(len(samples))):
@@ -198,13 +197,13 @@ def calculate_u_kn(
 
     assert total_nr_of_samples > 20  # make sure that there are samples present
 
-    np.save(f'u_kn_{nr_lambda_states}_{total_nr_of_samples}_{name}.npy', u_kn)
-    np.save(f'N_k_{total_nr_of_samples}_{nr_lambda_states}_{name}.npy', N_k)
+    np.save(f'{base}/{name}/analysis/u_kn_{len(lambda_scheme)}_{total_nr_of_samples}_{name}.npy', u_kn)
+    np.save(f'{base}/{name}/analysis/N_k_{total_nr_of_samples}_{len(lambda_scheme)}_{name}.npy', N_k)
 
     return (N_k, u_kn)
 
 def plot_overlap_for_equilibrium_free_energy(
-    N_k: np.array, u_kn: np.ndarray, n_samples: int, n_steps_per_sample: int, name: str
+    N_k: np.array, u_kn: np.ndarray, n_samples: int, n_steps_per_sample: int, name: str, base: str
 ):
     """
     Calculate the overlap for each state with each other state. The overlap is normalized to be 1 for each row.
@@ -232,6 +231,6 @@ def plot_overlap_for_equilibrium_free_energy(
         annot_kws={"size": "small"},
     )
     plt.title(f"Overlap matrix for {name}", fontsize=15)
-    plt.savefig(f"{name}_overlap_samples_{n_samples}_steps_{n_steps_per_sample}.png")
+    plt.savefig(f"{base}/{name}/analysis/{name}_overlap_samples_{n_samples}_steps_{n_steps_per_sample}.png")
     plt.show()
     plt.close()
