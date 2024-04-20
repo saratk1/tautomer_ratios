@@ -5,6 +5,7 @@ import mdtraj as md
 import numpy as np
 import yaml
 import sys
+import os
 
 config_path = sys.argv[1] # path to yaml file
 with open(config_path, 'r') as file:
@@ -13,17 +14,18 @@ with open(config_path, 'r') as file:
 name = config["tautomer_systems"]["name"]
 n_samples = config['sim_control_params']['n_samples']
 n_steps_per_sample = config['sim_control_params']['n_steps_per_sample']
-lambda_val = config['sim_control_params']['lambda_val']
-nr_lambda_states = config['sim_control_params']['nr_lambda_states']
+lambs = config['analysis']['lambda_scheme']
 base = config['base']
 
-if nr_lambda_states > 1:
-    lambs = np.linspace(0, 1, nr_lambda_states)
-elif nr_lambda_states == 1:
-    lambs = [lambda_val]
+if not os.path.exists(f"{base}/{name}/analysis"):
+    print("Creating directory:", f"{base}/{name}/analysis")
+    os.makedirs(f"{base}/{name}/analysis")
+
+if lambs == None:
+    lambs = [float(config['analysis']['lambda_val'])]
 
 for lambda_val in lambs:
-    print(f"Wrapping trajectory for lambda = {lambda_val:.4f}")
+    print(f"Wrapping trajectory for lambda = {float(lambda_val):.4f}")
     # load dcd file containting samples and topology from pdb file of the whole system
     box_traj = md.load_dcd(
                 f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
@@ -41,6 +43,6 @@ for lambda_val in lambs:
 
     # wrap
     new_traj = box_traj.make_molecules_whole(sorted_bonds=sorted_bonds)
-    traj_output = f'{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_wrapped.dcd'
+    traj_output = f'{base}/{name}/analysis/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_wrapped.dcd'
     print(f"writing wrapped trajectory to {traj_output}")
     new_traj.save_dcd(traj_output)
