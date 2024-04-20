@@ -6,6 +6,7 @@ channels:
 dependencies:
     # Base depends
   - python=3.11
+  - pip
 
   - openmm=8.1.0
   - openmm-torch 
@@ -16,8 +17,10 @@ dependencies:
   - rdkit
   - mdtraj
   - tqdm
+  - seaborn
 
     # Pip-only installs
   - pip:
     - git+https://github.com/sef43/torchani.git@patch_openmmml_issue50
     - git+https://github.com/saratk1/openmm-ml-taut.git
+    #- git+https://github.com/saratk1/taut_diff.git 
