@@ -17,10 +17,12 @@ n_steps_per_sample = config['sim_control_params']['n_steps_per_sample']
 lambs = config['analysis']['lambda_scheme']
 base = config['base']
 
+# create directory for analysis results
 if not os.path.exists(f"{base}/{name}/analysis"):
     print("Creating directory:", f"{base}/{name}/analysis")
     os.makedirs(f"{base}/{name}/analysis")
 
+# check if a single or more trajectories should be wrapped
 if lambs == None:
     lambs = [float(config['analysis']['lambda_val'])]
 
@@ -43,6 +45,9 @@ for lambda_val in lambs:
 
     # wrap
     new_traj = box_traj.make_molecules_whole(sorted_bonds=sorted_bonds)
+    # center
+    new_traj = box_traj.image_molecules(anchor_molecules=[set(box_traj.topology.residue(0).atoms)])
+
     traj_output = f'{base}/{name}/analysis/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_wrapped.dcd'
     print(f"writing wrapped trajectory to {traj_output}")
     new_traj.save_dcd(traj_output)
