@@ -1,4 +1,4 @@
-# module for wrapping the trajectory
+# script for wrapping the trajectory and centering the solute
 # first argument = path to yaml file
 
 import mdtraj as md
@@ -11,6 +11,7 @@ config_path = sys.argv[1] # path to yaml file
 with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
 
+# load information about the system
 name = config["tautomer_systems"]["name"]
 n_samples = config['sim_control_params']['n_samples']
 n_steps_per_sample = config['sim_control_params']['n_steps_per_sample']
@@ -33,6 +34,7 @@ for lambda_val in lambs:
                 f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
                 top=f"{base}/{name}/{name}_hybrid_solv.pdb", # also possible to use the tmp.pdb
             )
+    # load solute
     tautomer = md.load_pdb(f"{base}/{name}/{name}_hybrid.pdb")
 
     # get array of tautomer bonds
