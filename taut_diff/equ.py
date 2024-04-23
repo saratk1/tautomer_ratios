@@ -6,7 +6,7 @@ from openmmml import MLPotential
 from openmm import LangevinIntegrator
 from openmm import unit
 from openmm import MonteCarloBarostat
-from openmmtools.forces import FlatBottomRestraintBondForce
+from openmmtools.forces import FlatBottomRestraintBondForce, HarmonicRestraintBondForce
 from simtk.openmm import HarmonicAngleForce
 from taut_diff.tautomers import get_indices, get_atoms_for_restraint
 
@@ -79,12 +79,15 @@ def get_sim(solv_system,
 def get_bond_restraint(name:str, base:str, tautomer: str, lambda_val: float):
     atom_1, atom_2, _, _ = get_atoms_for_restraint(name=name,  base=base, tautomer=tautomer)
     if tautomer == "t1":
-        spring_constant = 10 * lambda_val
+        spring_constant = 0.75 * lambda_val
     elif tautomer == "t2":
-        spring_constant = 10 * (1 - lambda_val)
-    restraint_force = FlatBottomRestraintBondForce(spring_constant= spring_constant  * unit.kilocalories_per_mole / unit.angstrom**2,
-                                                well_radius= 1.5 * unit.angstrom,
-                                                restrained_atom_index1 = atom_1,  
+        spring_constant = 0.75 * (1 - lambda_val)
+    # restraint_force = FlatBottomRestraintBondForce(spring_constant= spring_constant  * unit.kilocalories_per_mole / unit.angstrom**2,
+    #                                             well_radius= 1.5 * unit.angstrom,
+    #                                             restrained_atom_index1 = atom_1,  
+    #                                             restrained_atom_index2 = atom_2)
+    restraint_force = HarmonicRestraintBondForce(spring_constant= spring_constant  * unit.kilocalories_per_mole / unit.angstrom**2,
+                                                restrained_atom_index1 = atom_1,
                                                 restrained_atom_index2 = atom_2)
     print(f"Restraining the bond between atoms {atom_1+1} and {atom_2+1} for tautomer {tautomer} with a flat bottom restraint (with a spring constant of {spring_constant} kcal/mol/A^2 and a well radius of 1.5 A)")
     return restraint_force
@@ -170,7 +173,7 @@ def calculate_u_kn(
     samples = np.array(samples.value_in_unit(unit.nanometer))  # positions in nanometer
     
     for k, lamb in enumerate(lambda_scheme):
-        print("Calculate Us for lambda = {:.1f}".format(lamb))
+        print("Calculate Us for lambda = {:.2f}".format(lamb))
         sim = get_sim(solv_system=solv_system, 
                       name=name, 
                       base=base,
@@ -197,10 +200,7 @@ def calculate_u_kn(
 
     assert total_nr_of_samples > 20  # make sure that there are samples present
 
-    np.save(f'{base}/{name}/analysis/u_kn_{len(lambda_scheme)}_{total_nr_of_samples}_{name}.npy', u_kn)
-    np.save(f'{base}/{name}/analysis/N_k_{total_nr_of_samples}_{len(lambda_scheme)}_{name}.npy', N_k)
-
-    return (N_k, u_kn)
+    return (N_k, u_kn, total_nr_of_samples)
 
 def plot_overlap_for_equilibrium_free_energy(
     N_k: np.array, u_kn: np.ndarray, n_samples: int, n_steps_per_sample: int, name: str, base: str
