@@ -6,6 +6,7 @@ import sys
 import torch
 from tqdm import tqdm
 from typing import Tuple
+import os
 
 from openmm import unit
 from openmm import unit
@@ -42,6 +43,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 platform = Platform.getPlatformByName("CUDA")  
 device_index = sys.argv[1]
 
+if not os.path.exists(f"{base}/{name}/analysis"):
+    print("Creating directory:", f"{base}/{name}/analysis")
+    os.makedirs(f"{base}/{name}/analysis")
+
 solv_system=app.PDBFile(f'{base}/{name}/{name}_hybrid_solv.pdb')
 
 print(f"Loading samples for {name}...")
@@ -55,7 +60,7 @@ for lambda_val in lambs:
 
 discard_frames=int((n_samples / 100) * 20) # discard first 20%
 
-N_k, u_kn = calculate_u_kn(
+N_k, u_kn, total_number_of_samples = calculate_u_kn(
     trajs=trajs,
     solv_system=solv_system,
     nnp=nnp,
@@ -66,8 +71,11 @@ N_k, u_kn = calculate_u_kn(
     device=device,
     device_index=device_index,
     discard_frames=discard_frames,
-    every_nth_frame=30,
+    every_nth_frame=2,
     )
+
+np.save(f'{base}/{name}/analysis/u_kn_{len(lambs)}_{total_number_of_samples}_{name}.npy', u_kn)
+np.save(f'{base}/{name}/analysis/N_k_{total_number_of_samples}_{len(lambs)}_{name}.npy', N_k)
 
 # initialize the MBAR maximum likelihood estimate
 mbar = MBAR(u_kn, N_k)
