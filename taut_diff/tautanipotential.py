@@ -168,16 +168,13 @@ class TautANIPotentialImpl(MLPotentialImpl):
                 #return self.energyScale*energy
 
         # is_periodic...
-        print("here")
         is_periodic = (topology.getPeriodicBoxVectors() is not None) or system.usesPeriodicBoundaryConditions()
         aniForce = ANIForce(model, species, atoms, is_periodic, implementation, self.lambda_val, self.t1_idx_mask, self.t2_idx_mask) 
-        print("here")
         # Convert it to TorchScript.
 
         module = torch.jit.script(aniForce)
 
         # Create the TorchForce and add it to the System.
-        print("here")
         force = openmmtorch.TorchForce(module)
         force.setForceGroup(forceGroup)
         force.setUsesPeriodicBoundaryConditions(is_periodic)
