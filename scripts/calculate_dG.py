@@ -8,14 +8,13 @@ from tqdm import tqdm
 from typing import Tuple
 import os
 
-from openmm import unit
-from openmm import unit
+# from openmm import unit
+# from openmm import unit
 from openmm import app
 from openmm import Platform
-from openmm import LangevinIntegrator
-from openmmml import MLPotential
-from openmm.app import Simulation
-from openmmtools.constants import kB
+# from openmm import LangevinIntegrator
+# from openmm.app import Simulation
+# from openmmtools.constants import kB
 
 import mdtraj as md
 from pymbar import MBAR
@@ -83,5 +82,6 @@ r = mbar.compute_free_energy_differences()["Delta_f"][0][-1]
 
 print("##################################################")
 print(f"Computed dG: {r*0.5922:.2f} kcal/mol") # convert from kBT to kcal/mol
-print(f"Experiment dG: {experiment:.2f} kcal/mol")
+print(f"Experimental dG: {experiment:.2f} kcal/mol")
+print(f"Error: {(experiment - r*0.5922):.2f} kcal/mol")
 print("##################################################")
