@@ -80,6 +80,7 @@ sim = get_sim(solv_system=solv_system,
             platform=platform,
             bond_restraints=True,
             angle_restraints=True,
+            control_param=4,
             device_index=device_index)
 
 ################################################ data collection setup ###############################################################
