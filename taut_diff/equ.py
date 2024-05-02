@@ -3,11 +3,9 @@ from tqdm import tqdm
 from typing import Tuple
 from taut_diff.tautanipotential import create_system
 from openmm.app import Simulation
-#from openmmml import MLPotential
 from openmm import LangevinIntegrator
 from openmm import unit
 from openmm import MonteCarloBarostat
-#from openmmtools.forces import FlatBottomRestraintBondForce, HarmonicRestraintBondForce
 from openmm import HarmonicBondForce
 from simtk.openmm import HarmonicAngleForce
 from taut_diff.tautomers import get_indices, get_atoms_for_restraint
@@ -21,6 +19,7 @@ def get_sim(solv_system,
             platform, 
             bond_restraints: bool = False, 
             angle_restraints: bool = False,
+            control_param: float = 4, # parameter for controling the restraint strength. 1 corresponds to the lambda scheme
             device_index: int = 0):
     
     from taut_diff.constant import (temperature, 
@@ -60,15 +59,15 @@ def get_sim(solv_system,
     # add restraints
     if bond_restraints:
             
-        bond_force_t1 = get_bond_restraint(name=name, base=base, tautomer="t1", lambda_val=lambda_val)
-        bond_force_t2 = get_bond_restraint(name=name, base=base, tautomer="t2", lambda_val=lambda_val)
+        bond_force_t1 = get_bond_restraint(name=name, base=base, tautomer="t1", lambda_val=lambda_val, control_param=control_param)
+        bond_force_t2 = get_bond_restraint(name=name, base=base, tautomer="t2", lambda_val=lambda_val, control_param=control_param)
         #system.addForce(restraints)
         system.addForce(bond_force_t1)
         system.addForce(bond_force_t2)
 
     if angle_restraints:
-        angle_force_1 = get_angle_restraint(name=name, base=base, tautomer="t1", lambda_val=lambda_val)
-        angle_force_2 = get_angle_restraint(name=name, base=base, tautomer="t2", lambda_val=lambda_val)
+        angle_force_1 = get_angle_restraint(name=name, base=base, tautomer="t1", lambda_val=lambda_val, control_param=control_param)
+        angle_force_2 = get_angle_restraint(name=name, base=base, tautomer="t2", lambda_val=lambda_val, control_param=control_param)
 
         system.addForce(angle_force_1) 
         system.addForce(angle_force_2)
@@ -85,12 +84,12 @@ def get_sim(solv_system,
     
     return sim
     
-def get_bond_restraint(name:str, base:str, tautomer: str, lambda_val: float):
+def get_bond_restraint(name:str, base:str, tautomer: str, lambda_val: float, control_param: float):
     atom_1, atom_2, _, _ = get_atoms_for_restraint(name=name,  base=base, tautomer=tautomer)
     if tautomer == "t1":
-        spring_constant = 1000 * lambda_val
+        spring_constant = 100 * (1 - np.min([(1-lambda_val)*control_param,1]))
     elif tautomer == "t2":
-        spring_constant = 1000 * (1 - lambda_val)
+        spring_constant = 100 * (1 - np.min([lambda_val*control_param,1]))
     # restraint_force = FlatBottomRestraintBondForce(spring_constant= spring_constant  * unit.kilocalories_per_mole / unit.angstrom**2,
     #                                             well_radius= 1.5 * unit.angstrom,
     #                                             restrained_atom_index1 = atom_1,  
@@ -105,15 +104,15 @@ def get_bond_restraint(name:str, base:str, tautomer: str, lambda_val: float):
                       particle2=atom_2, 
                       length=equilibrium_bond_length * unit.angstroms, 
                       k=spring_constant * unit.kilocalories_per_mole/unit.angstroms**2)
-    
+    restraint.setUsesPeriodicBoundaryConditions(True)
     print(f"Restraining the bond between atoms {atom_1+1} and {atom_2+1} with a harmonic restraint (with a spring constant of {spring_constant} kcal/mol/A^2 and an equilibrium bond length of {equilibrium_bond_length} A)")
     return restraint
 
-def get_angle_restraint(name:str, base:str, tautomer:str, lambda_val: float):
+def get_angle_restraint(name:str, base:str, tautomer:str, lambda_val: float, control_param:float):
     if tautomer == "t1":
-        k = 10 * lambda_val
+        k = 10 * (1 - np.min([(1-lambda_val)*control_param,1]))
     elif tautomer == "t2":
-        k = 10 * (1 - lambda_val)
+        k = 10 * (1 - np.min([lambda_val*control_param,1]))
     atom_1, atom_2, atom_3, angle = get_atoms_for_restraint(name=name, base=base, tautomer=tautomer)
     angle_force = HarmonicAngleForce()
     angle_force.addAngle(particle1=atom_1, 
@@ -121,6 +120,7 @@ def get_angle_restraint(name:str, base:str, tautomer:str, lambda_val: float):
                             particle3=atom_3, 
                             angle=angle * unit.radian, 
                             k=k * unit.kilocalories_per_mole / unit.radian**2) 
+    angle_force.setUsesPeriodicBoundaryConditions(True)
     print(f"Restraining the angle defined by atoms {atom_1+1}, {atom_2+1} and {atom_3+1} ({np.degrees(angle):.2f} degrees) with a harmonic angle restraint (with a harmonic force constant of {k} kcal/mole/rad^2)")
     return angle_force
 
@@ -198,8 +198,8 @@ def calculate_u_kn(
                       lambda_val=lamb, 
                       device=device,
                       platform=platform,
-                      bond_restraints=False,
-                      angle_restraints=False,
+                      bond_restraints=True,
+                      angle_restraints=True,
                       device_index=device_index)
         us = []
         for x in tqdm(range(len(samples))):
