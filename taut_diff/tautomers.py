@@ -12,6 +12,7 @@ import torch
 import os
 import yaml
 from typing import List
+import glob
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdFMCS
@@ -21,15 +22,16 @@ from rdkit.Chem.Draw import rdMolDraw2D
 from openmm import unit
 from openmm.app import PDBFile
 from openmm.vec3 import Vec3
-from openmmtools.constants import kB
+#from openmmtools.constants import kB
+from taut_diff.constant import kB
 
-import torchani
 import mdtraj as md
 from pdbfixer import PDBFixer
 import matplotlib.pyplot as plt
 
 from PIL import Image
 from io import BytesIO
+
 
 #visualize both tautomers
 #indexing starts at 1, as in the corresponding PDB file written by save_solv_pdb()
@@ -76,10 +78,10 @@ def visualize_tautomers(m1, m2, name, base):
     composed_image.paste(img1, (0, 0))
     composed_image.paste(img2, (img1.width, 0))
     
-    if not os.path.exists(f"{base}/{name}"):
-        os.makedirs(f"{base}/{name}")
+    if not os.path.exists(f"{base}"):
+        os.makedirs(f"{base}")
 
-    plt.savefig(f"{base}/{name}/{name}.png")
+    plt.savefig(f"{base}/{name}.png")
     plt.close()  
     
 def get_coordinates(m):
@@ -124,18 +126,19 @@ def find_idx(m1: int, m2: int):
         atoms += str(a.GetSymbol())
 
         if a.GetIdx() not in substructure_idx_m1:
-            print("Atom index not in MCS:", a.GetIdx()+1)
-            print("Index of atom that moves: {}.".format(a.GetIdx()+1))
+            #print("Atom index not in MCS:", a.GetIdx()+1)
+            #print("Index of atom that moves: {}.".format(a.GetIdx()+1))
             hydrogen_idx_that_moves = a.GetIdx()
-            print("Check element that moves:" ,a.GetSymbol())
+            #print("Check element that moves:" ,a.GetSymbol())
 
     # get idx of connected heavy atom which is the donor atom
     # there can only be one neighbor, therefor it is valid to take the first neighbor of the hydrogen
     donor = int(
         m1.GetAtomWithIdx(hydrogen_idx_that_moves).GetNeighbors()[0].GetIdx()
     )
-    print("Index of atom (tautomer 1) that donates hydrogen: {}".format(donor+1))
-    print("Element: ", m1.GetAtomWithIdx(hydrogen_idx_that_moves).GetNeighbors()[0].GetSymbol())
+    #print(f"idx of HET1 (heavy atom connected to hydrogen (D1) in the t1 topology): {donor}, element: {m1.GetAtomWithIdx(hydrogen_idx_that_moves).GetNeighbors()[0].GetSymbol()}")
+    #print("Index of atom (tautomer 1) that donates hydrogen: {}".format(donor+1))
+    #print("Element: ", m1.GetAtomWithIdx(hydrogen_idx_that_moves).GetNeighbors()[0].GetSymbol())
 
     # get idx of acceptor atom
     for i in range(len(substructure_idx_m1)):
@@ -152,9 +155,10 @@ def find_idx(m1: int, m2: int):
                 if substructure_idx_m1[i] == donor:
                     continue
                 acceptor = substructure_idx_m1[i]
-                print(
-                    "Index of atom that accepts hydrogen (tautomer 1): {}".format(acceptor+1)
-                )
+                #print(f"idx of HET2 (heavy atom connected to hydrogen (D2) in the t2 topology): {acceptor}, element: {substructure_idx_m1[i].GetSymbol()}")
+                # print(
+                #     "Index of atom that accepts hydrogen (tautomer 1): {}".format(acceptor+1)
+                # )
                 acceptor_count += 1
                 if acceptor_count > 1:
                     raise RuntimeError(
@@ -164,7 +168,7 @@ def find_idx(m1: int, m2: int):
     heavy_atom_hydrogen_donor_idx = donor
     hydrogen_idx = hydrogen_idx_that_moves
     heavy_atom_hydrogen_acceptor_idx = acceptor
-    print("donor idx: ", heavy_atom_hydrogen_donor_idx+1, ", acceptor: ", heavy_atom_hydrogen_acceptor_idx+1, ", hydrogen: ", hydrogen_idx+1)
+    #print("donor idx: ", heavy_atom_hydrogen_donor_idx+1, ", acceptor: ", heavy_atom_hydrogen_acceptor_idx+1, ", hydrogen: ", hydrogen_idx+1)
 
     return(heavy_atom_hydrogen_donor_idx, heavy_atom_hydrogen_acceptor_idx, hydrogen_idx)
 
@@ -253,8 +257,8 @@ def add_connect(pdb_filepath: str, hybrid_topology):
     with open(f"{pdb_filepath}", 'w') as f:
         f.writelines(new_lines)
 
-def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
-
+def save_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str, environment: str,box_length: float = 16, minimize: bool = False):
+    import torchani
     # generate rdkit molecule objects
     mol1 = Chem.MolFromSmiles(smiles_t1)
     mol2 = Chem.MolFromSmiles(smiles_t2)
@@ -263,11 +267,13 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
     m2 = Chem.AddHs(mol2)
 
     # visualize tautomers with atom indices
-    print("Generating representation of tautomer 1 and tautomer 2...")
+    print("Generating visualization of tautomer 1 and tautomer 2...")
     visualize_tautomers(m1, m2, name, base)
 
     # get indices 
-    print("Finding indices of donor, acceptor and hydrogen that moves...")
+    print("---------------------------------------------------------------------")
+    print("Hybrid structure will be created in the following way:\n1) find MCS between t1 and t2.\n2) Identify heavy atom (marked as HET1) index of t1 connected to the hydrogen (marked as D1), and the same for t2 (heavy atom HET2 connected to hydrogen D2)")
+    print("---------------------------------------------------------------------")
     heavy_atom_hydrogen_donor_idx, heavy_atom_hydrogen_acceptor_idx, hydrogen_idx = find_idx(m1, m2)
 
     # get hybrid atom numbers as a string
@@ -350,7 +356,8 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
                                           heavy_atom_hydrogen_donor_idx=heavy_atom_hydrogen_donor_idx)
 
     # update hybrid toplogy
-    pdb_filepath = f"{base}/{name}/{name}_hybrid.pdb"
+    #print("base----------------------------------------------",base)
+    pdb_filepath = f"{base}/{name}_hybrid.pdb"
     print("writing hybrid topology...")
     traj = md.Trajectory(min_coordinates.value_in_unit(unit.nanometer), hybrid_topology)
     modified_traj = traj.atom_slice(hybrid_topology.select("all"))
@@ -358,15 +365,72 @@ def save_solv_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str):
     #Save the modified trajectory with updated topology
     modified_traj.save_pdb(pdb_filepath)
 
+    # add connect record to pdb fileimport torchani
+    add_connect(pdb_filepath=pdb_filepath, hybrid_topology=hybrid_topology)
+
+    # minimize only if there is no minimized structure yet
+    minimized_pdb_files = glob.glob(os.path.join(base, '*minimized.pdb'))
+    #print("#################################",minimized_pdb_files)
+    
+    print("Minimizing was set to: ", minimize)
+    if minimize and not minimized_pdb_files:
+        print("System will be minimized...")
+        from ase.io import read, write
+        from ase.optimize import BFGS
+        import torchani
+
+        def remove_model_keywords(input_pdb, output_pdb):
+            with open(input_pdb, 'r') as f:
+                lines = f.readlines()
+            
+            # Filter out lines that contain 'MODEL' or 'ENDMDL'
+            cleaned_lines = [line for line in lines if not line.startswith('MODEL') and not line.startswith('ENDMDL')]
+            
+            # Write the cleaned lines to the output file
+            with open(output_pdb, 'w') as f:
+                f.writelines(cleaned_lines)
+
+            print(f"Cleaned PDB file written to {output_pdb}")
+        print("cleaning pdb file, so that ase can read it...")
+        remove_model_keywords(pdb_filepath, pdb_filepath)
+        print("reading in for minimization...", pdb_filepath)
+        system = read(pdb_filepath)
+        calculator = torchani.models.ANI2x().ase()
+        system.set_calculator(calculator)
+        print("Begin minimizing...")
+        opt = BFGS(system)
+        opt.run(fmax=0.01)
+        print()
+        pdb_filepath = f"{base}/{name}_hybrid_min.pdb"
+        write(pdb_filepath, system)
+    else:
+        print("No minimization required. Minimized PDB files found:", minimized_pdb_files)
+
+    # add connect record to pdb fileimport torchani
     add_connect(pdb_filepath=pdb_filepath, hybrid_topology=hybrid_topology)
 
     # solvate
-    print("solvating...")
-    pdb = PDBFixer(filename=pdb_filepath)
-    pdb.addSolvent(boxSize=Vec3(30,30,30)*unit.angstrom)
+    if environment == "waterbox":
+        print("solvating...")
+        print("pdb that is solvated", pdb_filepath)
+        pdb = PDBFixer(filename=pdb_filepath)
+        pdb.addSolvent(boxSize=Vec3(box_length,box_length,box_length)*unit.angstrom) ################################################### CHANGED
+        print("writing solvated hybrid topology...")
+        pdb_filepath = f'{base}/{name}_hybrid_solv.pdb'
+        PDBFile.writeFile(pdb.topology, pdb.positions, open(pdb_filepath, 'w'))
 
-    PDBFile.writeFile(pdb.topology, pdb.positions, open(f'{base}/{name}/{name}_hybrid_solv.pdb', 'w'))
+    return pdb_filepath
+
+def solvate(pdb_filepath: str, box_length, base, name):
+    print("Hybrid form in vacuum already exists. Solvating...")
+    print("pdb that is solvated", pdb_filepath)
+    pdb = PDBFixer(filename=pdb_filepath)
+    pdb.addSolvent(boxSize=Vec3(box_length,box_length,box_length)*unit.angstrom) ################################################### CHANGED
     print("writing solvated hybrid topology...")
+    pdb_filepath = f'{base}/{name}_hybrid_solv.pdb'
+    PDBFile.writeFile(pdb.topology, pdb.positions, open(pdb_filepath, 'w'))
+    
+    return pdb_filepath
 
 def get_indices(tautomer: str, ligand_topology,device) :
     # get indices of tautomer 1 and tautomer 2
@@ -376,38 +440,64 @@ def get_indices(tautomer: str, ligand_topology,device) :
     indices = indices.bool()
     return indices
 
-def get_atoms_for_restraint(name:str, base:str, tautomer:str):
+def get_atoms_for_restraint(name:str, base:str, tautomer:str, pdb_path:str):
     if tautomer == "t1":
         het_atom = "HET1"
         dummy_atom = "D1"
     elif tautomer == "t2":
         het_atom = "HET2"
         dummy_atom = "D2"
-
-    tautomer_system = md.load(f"{base}/{name}/{name}_hybrid.pdb")
+    #print("Setting restraints for tautomer: ", tautomer, ".......")
+    # print("inside restraint function.....................................")
+    #print("##################################-------------------------------------", f"{base}/{name}_hybrid.pdb")
+    #print("PDB file used for evaluating restraints: ", pdb_path)
+    tautomer_system = md.load(pdb_path)
     # get topology
     system_topology = tautomer_system.topology
+
+    
     # get indices of dummy atom, atom bound to dummy atom
     atom_1=next(system_topology.atoms_by_name(dummy_atom)).index
+    
     atom_2=next(system_topology.atoms_by_name(het_atom)).index
+    #print(atom_1, atom_2)
+    atom_1_name=next(system_topology.atoms_by_name(dummy_atom)).element
+    atom_2_name=next(system_topology.atoms_by_name(het_atom)).element
+    #print(atom_1_name, atom_2_name)
     # find index of the third atom
+    
+    # for bond in system_topology.bonds:
+    #     print("if you don't see anything printed here it means that there are no bonds---------------------------")
+    #     print(bond)
+    #     print("----")
+    
     for bond in system_topology.bonds:
-        # check if atom1 of the bond is the het_atom
+        #print("bond.atom1.name-----------------------------", bond.atom1.name)
+        # print("bond.atom1.index-----------------------------", bond.atom1.index)
+        #check if atom1 of the bond is the het_atom
         if bond.atom1.name == het_atom:
-            # check if it is not bound to the corresponding dummy atom and it is not a hydrogen atom
+            #print("inside if-------------------------------")
+            # #check if it is not bound to the corresponding dummy atom and it is not a hydrogen atom
+            # print("bond.atom2.name-----------------------------", bond.atom2.name)
+            # print("bond.atom1.element.symbol-----------------------------", bond.atom1.element.symbol)
+            # print("bond.atom2.element.symbol-----------------------------", bond.atom2.element.symbol)
             if not bond.atom2.name == dummy_atom and bond.atom2.element.symbol != "H":
                 atom_3=bond.atom2.index
                 break
         # same for if atom2 of the bond is the het_atom
         elif bond.atom2.name == het_atom:
+            #print("inside elif-------------------------------------------")
             if not bond.atom1.name == dummy_atom and bond.atom1.element.symbol != "H":
                 atom_3 = bond.atom1.index
+                #print("atom_3---------------------------------------", atom_3)
                 break
 
     # compute angle between those three atoms
     angle = md.compute_angles(tautomer_system, [[atom_1, atom_2, atom_3]]) # in radians
-    
+    #print("atoms---------------------------------------", atom_1, atom_2)
     return atom_1, atom_2, atom_3, angle[0][0]
+    # atom 1: dummy atom, atom 2: heavy atom
+    #return atom_1, atom_2
 
 if __name__ == "__main__":
 
@@ -419,7 +509,7 @@ if __name__ == "__main__":
     smiles_t2 = config["tautomer_systems"]["smiles_t2"]
     base = config["base"]
 
-    if not os.path.exists(f"{base}/{name}"):
-        os.makedirs(f"{base}/{name}")
+    if not os.path.exists(f"{base}"):
+        os.makedirs(f"{base}")
     # generate a hybrid structure and solvate (eg. for acetylacetone and the corresponding enol form):
     save_solv_pdb(name=name, smiles_t1=smiles_t1, smiles_t2=smiles_t2, base=base)

@@ -1,5 +1,6 @@
 # script for wrapping the trajectory and centering the solute
 # first argument = path to yaml file
+# second argument = run number
 
 import mdtraj as md
 import numpy as np
@@ -17,11 +18,14 @@ n_samples = config['sim_control_params']['n_samples']
 n_steps_per_sample = config['sim_control_params']['n_steps_per_sample']
 lambs = config['analysis']['lambda_scheme']
 base = config['base']
+exp = config['exp']
+environment = config['sim_control_params']['environment']
+run = sys.argv[2]
 
 # create directory for analysis results
-if not os.path.exists(f"{base}/{name}/analysis"):
-    print("Creating directory:", f"{base}/{name}/analysis")
-    os.makedirs(f"{base}/{name}/analysis")
+if not os.path.exists(f"{base}/{exp}/{run}/{name}/analysis"):
+    print("Creating directory:", f"{base}/{exp}/{run}/{name}/analysis")
+    os.makedirs(f"{base}/{exp}/{run}/{name}/analysis")
 
 # check if a single or more trajectories should be wrapped
 if lambs == None:
@@ -31,11 +35,11 @@ for lambda_val in lambs:
     print(f"Wrapping trajectory for lambda = {float(lambda_val):.4f}")
     # load dcd file containting samples and topology from pdb file of the whole system
     box_traj = md.load_dcd(
-                f"{base}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
-                top=f"{base}/{name}/{name}_hybrid_solv.pdb", # also possible to use the tmp.pdb
+                f"{base}/{exp}/{run}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
+                top=f"{base}/{exp}/{run}/{name}/{name}_hybrid_solv.pdb", # also possible to use the tmp.pdb #### CHANGED
             )
     # load solute
-    tautomer = md.load_pdb(f"{base}/{name}/{name}_hybrid.pdb")
+    tautomer = md.load_pdb(f"{base}/{exp}/{run}/{name}/{name}_hybrid.pdb")  #### CHANGED
 
     # get array of tautomer bonds
     def get_sorted_bonds(traj):
@@ -50,6 +54,6 @@ for lambda_val in lambs:
     # center
     new_traj = box_traj.image_molecules(anchor_molecules=[set(box_traj.topology.residue(0).atoms)])
 
-    traj_output = f'{base}/{name}/analysis/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_wrapped.dcd'
+    traj_output = f'{base}/{exp}/{run}/{name}/analysis/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}_wrapped.dcd'
     print(f"writing wrapped trajectory to {traj_output}")
     new_traj.save_dcd(traj_output)
