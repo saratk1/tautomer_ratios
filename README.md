@@ -6,6 +6,7 @@ taut_diff
 
 
 Tautomer ratios in solution
+Documentation and code under construction
 
 ### Copyright
 
