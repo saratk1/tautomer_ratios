@@ -9,8 +9,8 @@ import math
 import tempfile
 from openmm.app import PDBFile
 from pathlib import Path
-import taut_diff
-from taut_diff.tautomers import (
+import tautomer_ratios
+from tautomer_ratios.tautomers import (
     get_coordinates,
     get_atoms_for_restraint,
     get_hybrid_atom_numbers,
@@ -177,7 +177,7 @@ END
 
 @pytest.mark.parametrize("tautomer", ["t1", "t2"])
 def test_get_indices(tautomer):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     pdb = PDBFile(f"{package_base}/data/test_simulation/tp_558/run01/tp_558_hybrid_solv_13A_TEST.pdb")
     top = pdb.topology
     device = "cpu"
@@ -207,7 +207,7 @@ def test_get_indices(tautomer):
 
 @pytest.mark.parametrize("tautomer", ["t1", "t2"])
 def test_get_atoms_for_restraint(tautomer):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
     pdb_path = f"{base}/test_simulation/tp_558/run01/tp_558_hybrid_TEST.pdb"
     name = "tp_558"

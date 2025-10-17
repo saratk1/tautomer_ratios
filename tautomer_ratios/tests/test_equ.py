@@ -5,9 +5,9 @@ from openmm.app import Simulation
 from openmm import app, Platform, HarmonicBondForce, HarmonicAngleForce,CustomBondForce
 from pathlib import Path
 import mdtraj as md
-import taut_diff
+import tautomer_ratios
 from simtk import unit
-from taut_diff.equ import (get_sim,
+from tautomer_ratios.equ import (get_sim,
                            get_bond_restraint, 
                            get_angle_restraint, 
                            get_flat_bottom_restraint,
@@ -24,7 +24,7 @@ from openmm.unit import Quantity, nanometer
     ]
 )
 def test_simulation_object_creation(nnp):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
 
     sim = get_sim(
@@ -58,7 +58,7 @@ expected_constants_t2 = [100.0, 94.78947368421052, 89.57894736842105, 79.1578947
     ("t2", expected_constants_t2),
 ])
 def test_bond_restraint_spring_constants(tautomer, expected_constants):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
     pdb_path = f"{base}/test_simulation/tp_558/run01/tp_558_hybrid_TEST.pdb"
     environment = "waterbox"
@@ -123,7 +123,7 @@ expected_constants_angle_t2 = [
     ("t2", expected_constants_angle_t2),
 ])
 def test_angle_restraint_spring_constants(tautomer, expected_constants):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
     pdb_path = f"{base}/test_simulation/tp_558/run01/tp_558_hybrid_TEST.pdb"
     environment = "waterbox"
@@ -154,7 +154,7 @@ def test_angle_restraint_spring_constants(tautomer, expected_constants):
 
 @pytest.mark.parametrize("tautomer", ["t1", "t2"])
 def test_flat_bottom_restraint(tautomer):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
     pdb_path = f"{base}/test_simulation/tp_558/run01/tp_558_hybrid_TEST.pdb"
     bond_restr_constant = 100.0 
@@ -181,7 +181,7 @@ def test_flat_bottom_restraint(tautomer):
 
 @pytest.mark.parametrize("environment", ["vacuum", "waterbox"])
 def test_collect_equ_samples(capsys, environment):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
 
     traj = md.load_dcd(f"{base}/test_simulation/tp_558/run01/tp_558_short_traj_TEST.dcd", 
@@ -226,7 +226,7 @@ def test_collect_equ_samples(capsys, environment):
 )
 @pytest.mark.parametrize("environment", ["waterbox"])
 def test_calculate_u_kn_with_real_trajs(nnp, environment):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
     # Load a single trajectory and reuse it for 3 states
     traj = md.load_dcd(f"{base}/test_simulation/tp_558/run01/tp_558_short_traj_TEST.dcd",

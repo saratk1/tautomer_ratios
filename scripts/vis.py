@@ -2,7 +2,7 @@
 import numpy as np
 import yaml
 import sys
-from taut_diff.visualization import (
+from tautomer_ratios.visualization import (
      plot_accumulated_free_energy,
      plot_overlap_for_equilibrium_free_energy,
      plot_stddev_of_free_energy,
