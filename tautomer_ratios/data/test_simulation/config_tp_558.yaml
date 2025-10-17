@@ -1,5 +1,5 @@
 exp: "test_simulation"
-base: "tautomer_ratios/data/"
+base: "tautomer_ratios/data/" # adjust this path
 sim_control_params:
   n_samples: 10 
   n_steps_per_sample: 1 
