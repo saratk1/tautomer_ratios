@@ -1,12 +1,12 @@
 import pytest
 import torch
 from openmm import app, unit, Platform
-from taut_diff.equ import get_sim
+from tautomer_ratios.equ import get_sim
 from pathlib import Path
-import taut_diff
+import tautomer_ratios
 import yaml
-from taut_diff.tautomers import save_pdb
-from taut_diff.constant import temperature
+from tautomer_ratios.tautomers import save_pdb
+from tautomer_ratios.constant import temperature
 
 REFERENCE_ENERGIES = {
     "ani2x": -952307.6884740161,
@@ -20,7 +20,7 @@ def test_single_point_energy(nnp):
     corresponds to the energy of the pure enol form. 
     """
 
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
     name = "tp_558"
     pdb_path_vacuum = f"{base}/test_simulation/{name}/run01/{name}_hybrid_TEST.pdb"
@@ -66,7 +66,7 @@ def test_single_point_energy(nnp):
 @pytest.mark.slow
 @pytest.mark.parametrize("nnp", ["ani2x", "mace-off23-small"])
 def test_simulation(nnp):
-    package_base = Path(taut_diff.__file__).resolve().parent
+    package_base = Path(tautomer_ratios.__file__).resolve().parent
     base = package_base / "data"
     config_path = f"{base}/test_simulation/config_tp_558.yaml" 
     with open(config_path, 'r') as file:

@@ -19,10 +19,10 @@ from openmm.app import (
 )
 from openmm import app
 from openmm import Platform
-from taut_diff.tautomers import save_pdb, solvate
-from taut_diff.equ import get_sim
+from tautomer_ratios.tautomers import save_pdb, solvate
+from tautomer_ratios.equ import get_sim
 from openmm import unit
-from taut_diff.constant import temperature
+from tautomer_ratios.constant import temperature
 
 hostname = socket.gethostname()
 print(f"Running on node: {hostname}")

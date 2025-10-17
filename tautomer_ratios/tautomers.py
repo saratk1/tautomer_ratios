@@ -22,7 +22,7 @@ from rdkit.Chem.Draw import rdMolDraw2D
 from openmm import unit
 from openmm.app import PDBFile
 from openmm.vec3 import Vec3
-from taut_diff.constant import kB
+from tautomer_ratios.constant import kB
 
 import mdtraj as md
 from pdbfixer import PDBFixer

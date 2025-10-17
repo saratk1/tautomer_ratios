@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-import taut_diff
+import tautomer_ratios
 
 
 def test_taut_diff_imported():

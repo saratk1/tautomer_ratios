@@ -13,7 +13,7 @@ from openmm import Platform
 import matplotlib.pyplot as plt
 import mdtraj as md
 from pymbar import MBAR
-from taut_diff.equ import calculate_u_kn, compute_dG_flat_bottom_restraint
+from tautomer_ratios.equ import calculate_u_kn, compute_dG_flat_bottom_restraint
 
 print("\n")
 print("#################################################################################################################")
@@ -159,7 +159,7 @@ from pymbar import MBAR
 mbar = MBAR(u_kn, N_k)
 r = mbar.compute_free_energy_differences()["Delta_f"][0][-1]
 
-from taut_diff.constant import kBT
+from tautomer_ratios.constant import kBT
 from openmm import unit
 kBT_kcal = kBT.value_in_unit(unit.kilocalories_per_mole)
 dG = r * kBT_kcal

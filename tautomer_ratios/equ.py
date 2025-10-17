@@ -1,13 +1,13 @@
 import numpy as np
 from tqdm import tqdm
 from typing import Tuple
-from taut_diff.alchemical_potential import create_system_ani, create_system_mace
+from tautomer_ratios.alchemical_potential import create_system_ani, create_system_mace
 from openmm.app import Simulation
 from openmm import LangevinIntegrator, unit, MonteCarloBarostat, HarmonicBondForce, CustomBondForce
 from simtk.openmm import HarmonicAngleForce
 from openmm import app
 import mdtraj as md
-from taut_diff.tautomers import get_indices, get_atoms_for_restraint
+from tautomer_ratios.tautomers import get_indices, get_atoms_for_restraint
 from pymbar.other_estimators import exp as exponential_averaging
 
 def get_sim(solv_system, 
@@ -49,7 +49,7 @@ def get_sim(solv_system,
     """
     
     print("Ensemble was set to: ", ensemble)
-    from taut_diff.constant import (temperature, 
+    from tautomer_ratios.constant import (temperature, 
                                     pressure, 
                                     collision_rate, 
                                     stepsize)
@@ -369,7 +369,7 @@ def calculate_u_kn(
     Returns:
         np.ndarray: u_kn matrix
     """
-    from taut_diff.constant import kBT
+    from tautomer_ratios.constant import kBT
     #print("calculate ", len(trajs[0]))
     print("##################### calculate_u_kn function ###########################")
 
@@ -548,7 +548,7 @@ def compute_dG_flat_bottom_restraint(base:str,
             
         ws.append(w)
 
-    from taut_diff.constant import kBT
+    from tautomer_ratios.constant import kBT
     kBT_kcal = kBT.value_in_unit(unit.kilocalories_per_mole)
 
     #print(type(ws))
