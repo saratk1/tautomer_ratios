@@ -22,7 +22,6 @@ from rdkit.Chem.Draw import rdMolDraw2D
 from openmm import unit
 from openmm.app import PDBFile
 from openmm.vec3 import Vec3
-#from openmmtools.constants import kB
 from taut_diff.constant import kB
 
 import mdtraj as md
@@ -102,9 +101,9 @@ def get_coordinates(m):
 
 # NOTE: large parts of the following code are taken from https://github.com/choderalab/neutromeratio and adjusted to fit our needs
 # find indices of heavy atom acceptor, donor and idx of hydrogen that moves (idx of H in t1)
-def find_idx(m1: int, m2: int):
+def find_idx(m1, m2):
     # for clarity: tautomer 2 is used only for finding MCS
-    # NOTE: indices are modified, so that they start with 1 (& match the generated PDB file and the illustration)
+    # NOTE: indices in the print statements are modified, so that they start with 1 (& match the generated PDB file and the illustration)
     
     # find substructure and generate mol from substructure
     sub_m = rdFMCS.FindMCS(
@@ -181,7 +180,6 @@ def get_hybrid_atom_numbers(m):
 
 def get_topology(m):
     n = random.randint(1, 10000000)
-    # TODO: use tmpfile for this https://stackabuse.com/the-python-tempfile-module/ or io.StringIO
     _ = Chem.MolToPDBFile(m, f"tmp{n}.pdb")
     # get mdtraj topology
     ligand_topology = md.load(f"tmp{n}.pdb").topology
@@ -213,7 +211,7 @@ def get_hybrid_topology(ligand_topology, heavy_atom_hydrogen_acceptor_idx, hydro
     return hybrid_topology
 
 # sample on a sphere to find the position of the dummy atom
-def sample_spherical(acceptor:str, ndim=3):
+def sample_spherical(ndim=3):
     # sample a random direction
     unit_vector = np.random.randn(ndim)
     unit_vector /= np.linalg.norm(unit_vector, axis=0)
@@ -305,7 +303,7 @@ def save_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str, environment: 
         # generate new hydrogen atom position and define new hybrid coordinates
         ## TODO equilibrium bond lengths !!!! ####
 
-        new_hydrogen_coordinate = acceptor_coordinate + sample_spherical(acceptor = m1.GetAtomWithIdx(heavy_atom_hydrogen_acceptor_idx).GetSymbol())
+        new_hydrogen_coordinate = acceptor_coordinate + sample_spherical()
         new_hydrogen_coordinate = np.array([[new_hydrogen_coordinate]]) 
         hybrid_coord = (np.append(coordinates, new_hydrogen_coordinate, axis=1)) * unit.angstrom # changed from axis = 0
 
@@ -356,7 +354,6 @@ def save_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str, environment: 
                                           heavy_atom_hydrogen_donor_idx=heavy_atom_hydrogen_donor_idx)
 
     # update hybrid toplogy
-    #print("base----------------------------------------------",base)
     pdb_filepath = f"{base}/{name}_hybrid.pdb"
     print("writing hybrid topology...")
     traj = md.Trajectory(min_coordinates.value_in_unit(unit.nanometer), hybrid_topology)
@@ -370,7 +367,6 @@ def save_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str, environment: 
 
     # minimize only if there is no minimized structure yet
     minimized_pdb_files = glob.glob(os.path.join(base, '*minimized.pdb'))
-    #print("#################################",minimized_pdb_files)
     
     print("Minimizing was set to: ", minimize)
     if minimize and not minimized_pdb_files:
@@ -414,7 +410,7 @@ def save_pdb(name: str, smiles_t1: str, smiles_t2: str, base: str, environment: 
         print("solvating...")
         print("pdb that is solvated", pdb_filepath)
         pdb = PDBFixer(filename=pdb_filepath)
-        pdb.addSolvent(boxSize=Vec3(box_length,box_length,box_length)*unit.angstrom) ################################################### CHANGED
+        pdb.addSolvent(boxSize=Vec3(box_length,box_length,box_length)*unit.angstrom) 
         print("writing solvated hybrid topology...")
         pdb_filepath = f'{base}/{name}_hybrid_solv.pdb'
         PDBFile.writeFile(pdb.topology, pdb.positions, open(pdb_filepath, 'w'))
@@ -425,7 +421,7 @@ def solvate(pdb_filepath: str, box_length, base, name):
     print("Hybrid form in vacuum already exists. Solvating...")
     print("pdb that is solvated", pdb_filepath)
     pdb = PDBFixer(filename=pdb_filepath)
-    pdb.addSolvent(boxSize=Vec3(box_length,box_length,box_length)*unit.angstrom) ################################################### CHANGED
+    pdb.addSolvent(boxSize=Vec3(box_length,box_length,box_length)*unit.angstrom)
     print("writing solvated hybrid topology...")
     pdb_filepath = f'{base}/{name}_hybrid_solv.pdb'
     PDBFile.writeFile(pdb.topology, pdb.positions, open(pdb_filepath, 'w'))
@@ -440,61 +436,40 @@ def get_indices(tautomer: str, ligand_topology,device) :
     indices = indices.bool()
     return indices
 
-def get_atoms_for_restraint(name:str, base:str, tautomer:str, pdb_path:str):
+def get_atoms_for_restraint(tautomer:str, pdb_path:str):
     if tautomer == "t1":
         het_atom = "HET1"
         dummy_atom = "D1"
     elif tautomer == "t2":
         het_atom = "HET2"
         dummy_atom = "D2"
-    #print("Setting restraints for tautomer: ", tautomer, ".......")
-    # print("inside restraint function.....................................")
-    #print("##################################-------------------------------------", f"{base}/{name}_hybrid.pdb")
-    #print("PDB file used for evaluating restraints: ", pdb_path)
+  
     tautomer_system = md.load(pdb_path)
     # get topology
     system_topology = tautomer_system.topology
-
     
     # get indices of dummy atom, atom bound to dummy atom
     atom_1=next(system_topology.atoms_by_name(dummy_atom)).index
-    
     atom_2=next(system_topology.atoms_by_name(het_atom)).index
-    #print(atom_1, atom_2)
+
     atom_1_name=next(system_topology.atoms_by_name(dummy_atom)).element
     atom_2_name=next(system_topology.atoms_by_name(het_atom)).element
-    #print(atom_1_name, atom_2_name)
+
     # find index of the third atom
-    
-    # for bond in system_topology.bonds:
-    #     print("if you don't see anything printed here it means that there are no bonds---------------------------")
-    #     print(bond)
-    #     print("----")
-    
     for bond in system_topology.bonds:
-        #print("bond.atom1.name-----------------------------", bond.atom1.name)
-        # print("bond.atom1.index-----------------------------", bond.atom1.index)
         #check if atom1 of the bond is the het_atom
         if bond.atom1.name == het_atom:
-            #print("inside if-------------------------------")
-            # #check if it is not bound to the corresponding dummy atom and it is not a hydrogen atom
-            # print("bond.atom2.name-----------------------------", bond.atom2.name)
-            # print("bond.atom1.element.symbol-----------------------------", bond.atom1.element.symbol)
-            # print("bond.atom2.element.symbol-----------------------------", bond.atom2.element.symbol)
             if not bond.atom2.name == dummy_atom and bond.atom2.element.symbol != "H":
                 atom_3=bond.atom2.index
                 break
         # same for if atom2 of the bond is the het_atom
         elif bond.atom2.name == het_atom:
-            #print("inside elif-------------------------------------------")
             if not bond.atom1.name == dummy_atom and bond.atom1.element.symbol != "H":
                 atom_3 = bond.atom1.index
-                #print("atom_3---------------------------------------", atom_3)
                 break
 
     # compute angle between those three atoms
-    angle = md.compute_angles(tautomer_system, [[atom_1, atom_2, atom_3]]) # in radians
-    #print("atoms---------------------------------------", atom_1, atom_2)
+    angle = md.compute_angles(tautomer_system, [[atom_1, atom_2, atom_3]]) # in radians #TODO change to reading the angle from the other tautomeric form, not from the hybrid structure (yes, hybrid structure was minimized but the other option is sill better)
     return atom_1, atom_2, atom_3, angle[0][0]
     # atom 1: dummy atom, atom 2: heavy atom
     #return atom_1, atom_2
@@ -512,4 +487,4 @@ if __name__ == "__main__":
     if not os.path.exists(f"{base}"):
         os.makedirs(f"{base}")
     # generate a hybrid structure and solvate (eg. for acetylacetone and the corresponding enol form):
-    save_solv_pdb(name=name, smiles_t1=smiles_t1, smiles_t2=smiles_t2, base=base)
+    save_pdb(name=name, smiles_t1=smiles_t1, smiles_t2=smiles_t2, base=base)

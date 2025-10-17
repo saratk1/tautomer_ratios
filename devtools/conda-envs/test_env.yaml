@@ -1,26 +1,27 @@
-name: taut_diff_test
+name: tautomer_ratios
 channels:
   - conda-forge
   - pytorch
   - nvidia
+  
 dependencies:
     # Base depends
-  - python=3.11
-  - pip
-
-  - openmm=8.1.0
+  - python=3.12
+  - openmm
   - openmm-torch 
   - openmmtools 
-  - pytorch-cuda=11.8 
+  - pytorch-cuda
   - pytorch 
-  #- pytest
+  - pytorch-gpu
+  - nnpops
+  - torchani
+  - pytest
   - rdkit
-  - mdtraj
+  - mdtraj=1.9.9
   - tqdm
   - seaborn
 
     # Pip-only installs
   - pip:
-    - git+https://github.com/sef43/torchani.git@patch_openmmml_issue50
-    - git+https://github.com/saratk1/openmm-ml-taut.git
-    #- git+https://github.com/saratk1/taut_diff.git 
+    - mace-torch
+    - git+https://github.com/saratk1/tautomer_ratios.git 

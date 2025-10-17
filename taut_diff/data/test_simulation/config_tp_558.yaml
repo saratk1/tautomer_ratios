@@ -1,0 +1,30 @@
+exp: "test_simulation"
+base: "/home/stkaczyk/projects/taut_diff/taut_diff/data" #"taut_diff/data/"
+sim_control_params:
+  n_samples: 100 #100
+  n_steps_per_sample: 1 # 10
+  nnp:  "ani2x" #"mace-off23-small"
+  precision: "single"
+  ensemble: "npt"
+  environment: "waterbox"
+  box_length: 13
+  restraints:
+    bond: True
+    flat_bottom_bond: True
+    angle: True
+    bond_constant: 100 # 100
+    angle_constant: 10 #10
+  overwrite: True
+  minimize: False
+analysis:
+  lambda_val: Null
+  lambda_scheme: [0.0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95, 1.0] 
+  torsion_indices:  [7,5,6,13]
+  runs_analysis: ["run01", "run02", "run03"]
+  every_nth_frame: 50
+
+tautomer_systems:
+  name: "tp_558" 
+  smiles_t1: "Cc1nccc(O)c1" #enol 
+  smiles_t2: "CC(NC=C1)=CC1=O" #keto
+  dG: -5.730060000000001 
