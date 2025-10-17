@@ -5,16 +5,17 @@ import torchani
 import openmmtorch
 from typing import Tuple
 from NNPOps.neighbors import getNeighborPairs
-print("imported neighborpairs form nnpops------------------------------------------------------------------")
 
+# modified https://github.com/openmm/openmm-ml/blob/main/openmmml/models/anipotential.py
 class ANIForce(torch.nn.Module):
 
-    def __init__(self, model, species, periodic, implementation, lambda_val, t1_idx_mask, t2_idx_mask):
+    def __init__(self, model, species, periodic, lambda_val, t1_idx_mask, t2_idx_mask):
         
         super(ANIForce, self).__init__()
         self.model = model
         self.species = torch.nn.Parameter(species, requires_grad=False)
-        #########################################################
+        ######################################################### MODIFICATION 1
+
         # check which species should be masked
         mask_t1 = torch.nn.Parameter(t1_idx_mask, requires_grad=False)
         # first, get all species
@@ -22,19 +23,19 @@ class ANIForce(torch.nn.Module):
             species.clone().detach(), requires_grad=False
         )
         # mask dummy atom (defining topology of tautomer 2) with -1
-        self.t1_species[:, mask_t1] = -1 # CHANGED
-        #print(self.t1_species)
+        self.t1_species[:, mask_t1] = -1 
+        
         # do the same for tautomer 2
         mask_t2 = torch.nn.Parameter(t2_idx_mask, requires_grad=False)
         self.t2_species = torch.nn.Parameter(
             species.clone().detach(), requires_grad=False
         )
-        self.t2_species[:, mask_t2] = -1 # CHANGED
-        #print(self.t2_species)
-        #########################################################
+        self.t2_species[:, mask_t2] = -1 
+
+        ######################################################### MODIFICATION 1
         self.energyScale = torchani.units.hartree2kjoulemol(1)
         self.lambda_val = lambda_val 
-        self.implementation = implementation 
+        self.implementation = "torchani" 
 
         # if atoms is None:
         #     self.indices = None
@@ -52,113 +53,54 @@ class ANIForce(torch.nn.Module):
         # if self.indices is not None:
         #     positions = positions[self.indices]
         
-        ##########################################################
+        ########################################################## MODIFICATION 2
+
         # combine species and positions of tautomer 1 and tautomer 2
         # stack concatenates a sequence of tensors along a new dimension.
         species_positions_tuple = (
             torch.stack((self.t1_species, self.t2_species)).squeeze(),
             10.0 * positions.repeat(2, 1).reshape(2, -1, 3),
         )
-        # 
-        # int(f"t2 species: {self.t2_species}")
-        # print("positions", positions)
-        # print("species positions tuple", species_positions_tuple)
-        
-        ##########################################################
         
         if boxvectors is None:
-            #print("in vacuum")
-            #print(species_positions_tuple)
-            # if self.implementation== "nnpops":
-            #     _, t1 = self.model((self.t1_species, 10.0*positions.unsqueeze(0))) 
-            #     _, t2 = self.model((self.t2_species, 10.0*positions.unsqueeze(0))) 
-            #     # print(f"t1 energy: {t1}")
-            #     # print(f"t2 energy: {t2}")
-            #     return self.energyScale * (
-            #         (self.lambda_val * t2) + ((1 - self.lambda_val) * t1)
-            #    )
-            #elif self.implementation == "torchani":
-            # _, t1 = self.model((self.t1_species, 10.0*positions.unsqueeze(0))) 
-            # _, t2 = self.model((self.t2_species, 10.0*positions.unsqueeze(0))) 
+            #_, energy = self.model((self.species, 10.0*positions.unsqueeze(0)))
             _, energy = self.model(species_positions_tuple)
-            # # print("energy", energy)
-            # # print(f"lambda val:", self.lambda_val)
+      
             t1 = energy[0]
             t2 = energy[1]
-            # # print("t1 energy:", t1)
-            # # print("t2 energy:", t2)
-            # # print("----------------------------------------")
+
             return self.energyScale * (
                 (self.lambda_val * t2) + ((1 - self.lambda_val) * t1)
             )
-           
+
         else:
-            #print("periodic system-----------------------")
             boxvectors = boxvectors.to(torch.float32)
-            
-            ######################################################### 
             if self.implementation == "torchani":
-                #print("here torchani----------------------------")
                 positions = positions - torch.outer(torch.floor(positions[:,2]/boxvectors[2,2]), boxvectors[2])
                 positions = positions - torch.outer(torch.floor(positions[:,1]/boxvectors[1,1]), boxvectors[1])
                 positions = positions - torch.outer(torch.floor(positions[:,0]/boxvectors[0,0]), boxvectors[0])
-            #########################################################
 
-                ##########################################################
                 # combine species and wrapped postions of tautomer 1 and tautomer 2
                 species_positions_tuple = (
                     torch.stack((self.t1_species, self.t2_species)).squeeze(),
                     10.0 * positions.repeat(2, 1).reshape(2, -1, 3),
                 )
-                #print("species positions tuple: ", species_positions_tuple)
-                ##########################################################
                 
-                #_, energy_full = self.model((self.species, 10.0*positions.unsqueeze(0)), cell=10.0*boxvectors, pbc=self.pbc)
+                #_, energy = self.model((self.species, 10.0*positions.unsqueeze(0)), cell=10.0*boxvectors, pbc=self.pbc)
                 _, energy = self.model(species_positions_tuple, cell=10.0*boxvectors, pbc=self.pbc) 
-                #print("energy-----------------", energy)
-                
-                #########################################################################
+
                 # get the energy of tautomer 1 and tautomer 2
-                #print(energy[0])
+
                 t1 = energy[0]
                 t2 = energy[1]
-                # print(f"t1: {float(t1.detach())}")
-                # print(f"t2: {float(t2.detach())}")
-                # print(f"t1 and t2 added: {float(t1.detach())+float(t2.detach())}")
                 
                 return self.energyScale * (
                     (self.lambda_val * t2) + ((1 - self.lambda_val) * t1)
                 )
-            
-            elif self.implementation == "nnpops":
-                #print("here nnpops----------------------------")
-                # _, t1 = self.model((self.t1_species, 10.0*positions.unsqueeze(0)), cell=10.0*boxvectors, pbc=self.pbc)
-                # _, t2 = self.model((self.t2_species, 10.0*positions.unsqueeze(0)), cell=10.0*boxvectors, pbc=self.pbc)
-                #print(t1, t2)
-                species_positions_tuple = (
-                    torch.stack((self.t1_species, self.t2_species)).squeeze(),
-                    10.0 * positions.repeat(2, 1).reshape(2, -1, 3),
-                )
-                _, energy = self.model(species_positions_tuple, cell=10.0*boxvectors, pbc=self.pbc) 
-                t1 = energy[0]
-                t2 = energy[1]
 
-                return self.energyScale * (
-                    (self.lambda_val * t2) + ((1 - self.lambda_val) * t1)
-                )
+                ########################################################## MODIFICATION 2
 
-        # print(self.lambda_val)
-        # return_value = self.energyScale * (
-        #     torch.abs((t2) -  t1)
-        # )
-        # print(f"return: {return_value}")
-        # interpolate between potential of tautomer 1 and tautomer 2 with lambda
-        # return self.energyScale * (
-        #     (self.lambda_val * t2) + ((1 - self.lambda_val) * t1)
-        # )
-        ##########################################################################
-        #return self.energyScale*energy
-
+# modified https://github.com/openmm/openmm-ml/blob/main/openmmml/models/macepotential.py
 class MACEForce(torch.nn.Module):
     """
     MACEForce class to be used with TorchForce.
@@ -189,7 +131,7 @@ class MACEForce(torch.nn.Module):
         periodic: bool,
         dtype: torch.dtype,
         returnEnergyType: str,
-        d1: int, # NEW
+        d1: int, # added indices of dummy atoms
         d2: int,
         lambda_val
     ) -> None:
@@ -224,13 +166,11 @@ class MACEForce(torch.nn.Module):
         else:
             self.indices = torch.tensor(sorted(atoms), dtype=torch.int64)
 
-        ######################################################################################################################
-        self.mask_d1 = d1 # NEW
+        ########################################################## MODIFICATION 3
+        self.mask_d1 = d1 
         self.mask_d2 = d2
-        #print("self mask d1", self.mask_d1)
-        #print("self mask d2", self.mask_d2)
         self.lambda_val = lambda_val
-        ######################################################################################################################
+        ########################################################## MODIFICATION 3
         
         # Create the default input dict.
         self.register_buffer("ptr", torch.tensor([0, nodeAttrs.shape[0]], dtype=torch.long, requires_grad=False))
@@ -267,29 +207,18 @@ class MACEForce(torch.nn.Module):
             The shifts.
         """
         
-        ######################################################################################################################
-        # print(f"positions {positions}")
-        # print(f"self model r_max {self.model.r_max}")
-        # print(f"cell {cell}")
-        ######################################################################################################################
-        
-        # Get the neighbor pairs, shifts and edge indices.
-
-        
         neighbors, wrappedDeltas, _, _ = getNeighborPairs(
             positions, self.model.r_max, -1, cell
         )
-        #print(f"neigbors: {neighbors}")
+        ########################################################## MODIFICATION 4
         mask = (neighbors >= 0)
-        ###################################################################################################################### # NEW
-        #print(f"idx of atom that should be masked: {mask_atom_idx}")
-        #print(f"mask BEFORE considering dummy atom: {mask}")
         
         # if an atom index to mask is provided, exclude pairs involving that atom index
         if mask_atom_idx is not None:
             mask &= (neighbors[0] != mask_atom_idx) & (neighbors[1] != mask_atom_idx)
-            #print(f"mask AFTER considering dummy atom: {mask}")
-        ######################################################################################################################
+
+        ########################################################## MODIFICATION 4
+
         neighbors = neighbors[mask].view(2, -1)
         wrappedDeltas = wrappedDeltas[mask[0], :]
 
@@ -333,10 +262,7 @@ class MACEForce(torch.nn.Module):
         else:
             cell = None
         
-        #print(f"self mask d1: {self.mask_d1}")
-        #print(f"self mask d2: {self.mask_d2}")
-        
-        ######################################################################################################################
+        ########################################################## MODIFICATION 5
         # Get the shifts and edge indices.
         edgeIndex_1, shifts_1 = self._getNeighborPairs(positions, cell, mask_atom_idx=self.mask_d1) # NEW
         edgeIndex_2, shifts_2 = self._getNeighborPairs(positions, cell, mask_atom_idx=self.mask_d2)
@@ -361,7 +287,7 @@ class MACEForce(torch.nn.Module):
             "edge_index": edgeIndex_2,
             "shifts": shifts_2,
             "cell": cell if cell is not None else torch.zeros(3, 3, dtype=self.dtype),
-        }   #NEW                
+        }             
 
         # Predict the energy.
         energy_1 = self.model(inputDict_1, compute_force=False)[
@@ -382,51 +308,51 @@ class MACEForce(torch.nn.Module):
         return self.energyScale * (
                     (self.lambda_val * energy_1) + ((1 - self.lambda_val) * energy_2) 
                 )
-        ######################################################################################################################
+        ########################################################## MODIFICATION 5
 
-def create_system(nnp_name, topology, implementation, lambda_val, t1_idx_mask, t2_idx_mask, modelPath: str = None, removeCMMotion: bool = True):
+def create_system_ani(nnp_name, topology, lambda_val, t1_idx_mask, t2_idx_mask, modelPath: str = None, removeCMMotion: bool = True):
 # topology: openmm.app.Topology,
 #         system: openmm.System,
 #         atoms: Optional[Iterable[int]],
 #         forceGroup: int,
 #         precision: Optional[str] = None,
 #         returnEnergyType: str = "interaction_energy",
-    #if nnp_name.startswith("ani"):
+    implementation = "torchani"
     print(f"Loading ANI model: {nnp_name}......")
     # Create the TorchANI model.
     # `nnpops` throws error if `periodic_table_index`=False if one passes `species` as `species_to_tensor` from `element`
     
-    # FROM anipotential.py addForces() ----------------
+    ########################################################## FROM anipotential.py addForces()
+
     _kwarg_dict = {'periodic_table_index': True}
     if nnp_name == 'ani2x':
         model = torchani.models.ANI2x(**_kwarg_dict)
     else:
         raise ValueError(f'Unsupported ANI model: {nnp_name}')
-    # ---------------------------------------------------
 
     # Create the PyTorch model that will be invoked by OpenMM.
     atoms = list(topology.atoms())
-    #print("atoms", atoms)
+
     # if atoms is not None: 
     #     includedAtoms = [includedAtoms[i] for i in atoms]
     species = torch.tensor([[atom.element.atomic_number for atom in atoms]])
-    #print("species", species)
 
-    if implementation == 'nnpops':
-        #print("implementation: nnpops")
-        try:
-            from NNPOps import OptimizedTorchANI
-            model = OptimizedTorchANI(model, species)
-        except Exception as e:
-            print(f"failed to equip `nnpops` with error: {e}")
-    elif implementation == "torchani":
+    # if implementation == 'nnpops':
+    #     #print("implementation: nnpops")
+    #     try:
+    #         from NNPOps import OptimizedTorchANI
+    #         model = OptimizedTorchANI(model, species)
+    #     except Exception as e:
+    #         print(f"failed to equip `nnpops` with error: {e}")
+    if implementation == "torchani":
         pass # do nothing
     else:
         raise NotImplementedError(f"implementation {implementation} is not supported")
+    ########################################################## FROM anipotential.py addForces()
 
+    ########################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/mlpotential.py
     #create openmm system
     system = openmm.System()
-    print("CHECK if system was created: ", system)
     if topology.getPeriodicBoxVectors() is not None:
         system.setDefaultPeriodicBoxVectors(*topology.getPeriodicBoxVectors())
     for atom in topology.atoms():
@@ -435,45 +361,41 @@ def create_system(nnp_name, topology, implementation, lambda_val, t1_idx_mask, t
             system.addParticle(0)
         else:
             system.addParticle(atom.element.mass)
-    # NEW !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     if removeCMMotion:
         system.addForce(openmm.CMMotionRemover())
+    ########################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/mlpotential.py
 
+    ########################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/models/anipotential.py
+    
     # is_periodic...
     is_periodic = (topology.getPeriodicBoxVectors() is not None) or system.usesPeriodicBoundaryConditions()
-    aniForce = ANIForce(model, species, is_periodic, implementation, lambda_val, t1_idx_mask, t2_idx_mask)
+    aniForce = ANIForce(model, species, is_periodic, lambda_val, t1_idx_mask, t2_idx_mask)
     # Convert it to TorchScript.
     module = torch.jit.script(aniForce)
 
     # Create the TorchForce and add it to the System.
     force = openmmtorch.TorchForce(module)
-    force.setForceGroup(0) ############################################################# NEEDED?
+    force.setForceGroup(0)
     force.setUsesPeriodicBoundaryConditions(is_periodic)
     system.addForce(force)  
-    print("CHECK if system still exists before returning it : ", system)
 
+    ########################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/models/anipotential.py
     return system
     
-    
-def create_system_mace(nnp_name, topology, implementation, lambda_val, d1, d2, modelPath: str = None, removeCMMotion: bool = True, precision: str = "single"):
-    #elif nnp_name.startswith("mace"):
-    ######################################################## from addforces
+def create_system_mace(nnp_name, topology, lambda_val, d1, d2, modelPath: str = None, removeCMMotion: bool = True, precision: str = "single"):
+
+    ######################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/models/macepotential.py
     import torch
     import openmmtorch
-    
-    
-    ################################ NEW
-    
+
+    ########################################################
     returnEnergyType = "interaction_energy"
     modelPath = None
     atoms = None # if None, all atoms are included
     precision = precision
     print(f"Simulation will be run in {precision} precision")
-    forceGroup = 0
-    
-    
-    ##################################
-    
+    forceGroup = 0 
+    ########################################################   
 
     try:
         from mace.tools import utils, to_one_hot, atomic_numbers_to_indices
@@ -492,7 +414,6 @@ def create_system_mace(nnp_name, topology, implementation, lambda_val, d1, d2, m
         )
     try:
         from NNPOps.neighbors import getNeighborPairs
-        #print("imported neighborpairs form nnpops------------------------------------------------------------------")
     except ImportError as e:
         raise ImportError(
             f"Failed to import NNPOps with error: {e}. "
@@ -557,11 +478,9 @@ def create_system_mace(nnp_name, topology, implementation, lambda_val, d1, d2, m
         ).unsqueeze(-1),
         num_classes=len(zTable),
     )
-    ########################################################
-    
-    ##################################################################
+    ######################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/models/macepotential.py
 
-    # FROM mlpotential.py
+    ########################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/mlpotential.py
 
     #create openmm system
     system = openmm.System()
@@ -572,25 +491,15 @@ def create_system_mace(nnp_name, topology, implementation, lambda_val, d1, d2, m
             system.addParticle(0)
         else:
             system.addParticle(atom.element.mass)
-    # NEW !!!!!!!!!!!!!!!!!!!!!!!!! CMM
     if removeCMMotion:
         system.addForce(openmm.CMMotionRemover())
+    ########################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/mlpotential.py
 
-
-    #########################################################
-
+    ######################################################## https://github.com/openmm/openmm-ml/blob/main/openmmml/models/macepotential.py
     isPeriodic = (
         topology.getPeriodicBoxVectors() is not None
     ) or system.usesPeriodicBoundaryConditions()
     
-    ##################################
-    # d1=13
-    # d2=15
-    print(f"d1: {d1}")
-    print(f"d2: {d2}")
-    
-    ##################################
-
     maceForce = MACEForce(
         model,
         nodeAttrs,
