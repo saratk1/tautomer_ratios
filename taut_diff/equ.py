@@ -1,19 +1,10 @@
 import numpy as np
-import os
-import torch
 from tqdm import tqdm
 from typing import Tuple
-from taut_diff.tautanipotential import create_system, create_system_mace
+from taut_diff.alchemical_potential import create_system_ani, create_system_mace
 from openmm.app import Simulation
-from openmm import LangevinIntegrator
-from openmm import unit
-from openmm import MonteCarloBarostat
-from openmm import HarmonicBondForce
-from openmm import CustomBondForce
+from openmm import LangevinIntegrator, unit, MonteCarloBarostat, HarmonicBondForce, CustomBondForce
 from simtk.openmm import HarmonicAngleForce
-from pymbar import MBAR
-import matplotlib.pyplot as plt
-import seaborn as sns
 from openmm import app
 import mdtraj as md
 from taut_diff.tautomers import get_indices, get_atoms_for_restraint
@@ -21,21 +12,17 @@ from pymbar.other_estimators import exp as exponential_averaging
 
 def get_sim(solv_system, 
             environment: str,
-            name: str,
-            base: str,
             nnp:str, 
-            implementation: str,
             lambda_val: float, 
             device, 
             platform, 
-            pdb_path:str,
+            pdb_path_vacuum:str, 
             ensemble: str,
             bond_restraints: bool = False, 
             flat_bottom_restraints: bool = False,
             angle_restraints: bool = False,
             bond_restr_constant: float = 100,
             angle_restr_constant: float = 50,
-            device_index: int = 0, 
             precision: str = "single"):
     """
     Generates a simulation object for the given system, environment, and simulation parameters.
@@ -43,14 +30,11 @@ def get_sim(solv_system,
     Args:
         solv_system (object): The solvated system object.
         environment (str): The environment of the simulation (e.g. "waterbox").
-        name (str): The name of the system.
-        base (str): The base path for the data.
         nnp (str): The name of the neural network potential.
-        implementation (str): The implementation of the neural network potential.
         lambda_val (float): The lambda value for the simulation.
         device (object): The device to use for the simulation.
         platform (object): The platform to use for the simulation.
-        pdb_path (str): The path to the PDB file.
+        pdb_path (str): The path to the PDB file (vacuum -- connectivity needed).
         ensemble (str): The ensemble to use for the simulation (e.g. "npt").
         bond_restraints (bool, optional): Whether to add bond restraints.
         flat_bottom_restraints (bool, optional): Whether to add flat-bottom restraints.
@@ -77,17 +61,16 @@ def get_sim(solv_system,
     #print("DEVICE", device)
     print(f"Indices that will be masked in t1: {t1_idx_mask}")
     print(f"Indices that will be masked in t2: {t2_idx_mask}")
-    d1, _, _, _ = get_atoms_for_restraint(name=name,  base=base, tautomer="t1", pdb_path=pdb_path)
-    d2, _, _, _ = get_atoms_for_restraint(name=name,  base=base, tautomer="t2", pdb_path=pdb_path)
+    d1, _, _, _ = get_atoms_for_restraint(tautomer="t1", pdb_path=pdb_path_vacuum)
+    d2, _, _, _ = get_atoms_for_restraint(tautomer="t2", pdb_path=pdb_path_vacuum)
 
     print("\n")
     print("############################################################")
     print("Creating system....")
     print("############################################################ \n")
     if nnp.startswith("ani"):
-        system = create_system(nnp_name=nnp,
+        system = create_system_ani(nnp_name=nnp,
                             topology=system_topology,
-                            implementation=implementation,
                             lambda_val=lambda_val,
                             t1_idx_mask=t1_idx_mask,
                             t2_idx_mask=t2_idx_mask,
@@ -95,7 +78,6 @@ def get_sim(solv_system,
     elif nnp.startswith("mace"):
         system = create_system_mace(nnp_name=nnp,
                             topology=system_topology,
-                            implementation=implementation,
                             lambda_val=lambda_val,
                             d1 = d1,
                             d2 = d2,
@@ -113,21 +95,15 @@ def get_sim(solv_system,
         print("############################################################")
         print("Adding flat bottom restraints....")
         print("############################################################ \n")
-        flatt_bottom_bond_force_t1 = get_flat_bottom_restraint(name=name, 
-                                           base=base,
+        flatt_bottom_bond_force_t1 = get_flat_bottom_restraint(
                                            tautomer="t1", 
-
-                                           environment=environment, 
                                            bond_restr_constant=bond_restr_constant,
-                                           pdb_path=pdb_path
+                                           pdb_path=pdb_path_vacuum
                                            )
-        flatt_bottom_bond_force_t2 = get_flat_bottom_restraint(name=name, 
-                                           base=base, 
+        flatt_bottom_bond_force_t2 = get_flat_bottom_restraint(
                                            tautomer="t2", 
-
-                                           environment=environment,
                                            bond_restr_constant=bond_restr_constant,
-                                           pdb_path=pdb_path
+                                           pdb_path=pdb_path_vacuum
                                            )
         # add the flat bottom restraint to a different force group so that it can be retrieved more easily
         flatt_bottom_bond_force_t1.setForceGroup(1) 
@@ -141,41 +117,33 @@ def get_sim(solv_system,
         print("############################################################")
         print("Adding restraints....")
         print("############################################################ \n")
-        bond_force_t1 = get_bond_restraint(name=name, 
-                                           base=base,
-                                           tautomer="t1", 
+        bond_force_t1 = get_bond_restraint(tautomer="t1", 
                                            lambda_val=lambda_val, 
                                            environment=environment, 
                                            bond_restr_constant=bond_restr_constant,
-                                           pdb_path=pdb_path
+                                           pdb_path=pdb_path_vacuum
                                            )
-        bond_force_t2 = get_bond_restraint(name=name, 
-                                           base=base, 
-                                           tautomer="t2", 
+        bond_force_t2 = get_bond_restraint(tautomer="t2", 
                                            lambda_val=lambda_val, 
                                            environment=environment,
                                            bond_restr_constant=bond_restr_constant,
-                                           pdb_path=pdb_path
+                                           pdb_path=pdb_path_vacuum
                                            )
         system.addForce(bond_force_t1)
         system.addForce(bond_force_t2)
 
     if angle_restraints:
-        angle_force_1 = get_angle_restraint(name=name, 
-                                            base=base, 
-                                            tautomer="t1", 
+        angle_force_1 = get_angle_restraint(tautomer="t1", 
                                             lambda_val=lambda_val, 
                                             environment=environment,
                                             angle_restr_constant=angle_restr_constant,
-                                            pdb_path=pdb_path
+                                            pdb_path=pdb_path_vacuum
                                             )
-        angle_force_2 = get_angle_restraint(name=name, 
-                                            base=base, 
-                                            tautomer="t2", 
+        angle_force_2 = get_angle_restraint(tautomer="t2", 
                                             lambda_val=lambda_val, 
                                             environment=environment,
                                             angle_restr_constant=angle_restr_constant,
-                                            pdb_path=pdb_path
+                                            pdb_path=pdb_path_vacuum
                                             )
 
         system.addForce(angle_force_1) 
@@ -201,16 +169,14 @@ def get_sim(solv_system,
     print("CHECK if sim.context is available: ", sim.context)
     return sim
     
-def get_bond_restraint(name:str, 
-                       base:str, 
-                       tautomer: str, 
+def get_bond_restraint(tautomer: str, 
                        lambda_val: float, 
                        environment: str, 
-                       bond_restr_constant: float,
+                       bond_restr_constant: float, # TODO change name to max_bond_restr_constant
                        pdb_path: str
                        ):
     # get atom indices for bond restraint
-    atom_1, atom_2, _, _ = get_atoms_for_restraint(name=name,  base=base, tautomer=tautomer, pdb_path=pdb_path)
+    atom_1, atom_2, _, _ = get_atoms_for_restraint(tautomer=tautomer, pdb_path=pdb_path)
     if tautomer == "t1":
         k_start, k_end = 1, bond_restr_constant
         lambda_start, lambda_end = 0.05, 1.0
@@ -242,16 +208,12 @@ def get_bond_restraint(name:str,
     #print(f"Restraining the bond between atoms {atom_1+1} and {atom_2+1} with a harmonic restraint (with a spring constant of {spring_constant} kcal/mole/A^2 and an equilibrium bond length of {equilibrium_bond_length} A)")
     return restraint
 
-
-def get_flat_bottom_restraint(name:str, 
-                       base:str, 
-                       tautomer: str,  
-                       environment: str, 
+def get_flat_bottom_restraint(tautomer: str,  
                        bond_restr_constant: float,
                        pdb_path: str
                        ):
     # get atom indices for bond restraint
-    atom_1, atom_2, _, _ = get_atoms_for_restraint(name=name,  base=base, tautomer=tautomer, pdb_path=pdb_path)
+    atom_1, atom_2, _, _ = get_atoms_for_restraint(tautomer=tautomer, pdb_path=pdb_path)
     
     # create a CustomBondForce for the flat-bottom restraint
     flat_bottom_force = CustomBondForce("step(r - r0) * 0.5 * K * (r - r0)^2")
@@ -261,21 +223,18 @@ def get_flat_bottom_restraint(name:str,
     flat_bottom_force.addPerBondParameter("K")   
 
     # add a bond between two atoms (indices of atom_1 and atom_2) with specific parameters
-    #r0 = 1 nm, K = 100 kJ/mol/nm^2
     equilibrium_bond_length=1.5
     flat_bottom_force.addBond(atom_1, atom_2, [equilibrium_bond_length * unit.angstroms, bond_restr_constant* unit.kilocalories_per_mole/unit.angstroms**2])
 
     return flat_bottom_force
 
-def get_angle_restraint(name:str, 
-                        base:str, 
-                        tautomer:str, 
+def get_angle_restraint(tautomer:str, 
                         lambda_val: float, 
                         environment: str, 
                         angle_restr_constant: float,
                         pdb_path:str):
     if tautomer == "t1":
-        k_start, k_end = 1, angle_restr_constant
+        k_start, k_end = 0.1, angle_restr_constant
         lambda_start, lambda_end = 0.05, 1.0
 
         if lambda_val == 0.0:  # Special case for lambda = 1
@@ -293,7 +252,7 @@ def get_angle_restraint(name:str,
             # Interpolate linearly
             k = k_start + (k_end - k_start) * (lambda_val - lambda_start) / (lambda_end - lambda_start)
     # get atom indices and angle for angle restraint
-    atom_1, atom_2, atom_3, angle = get_atoms_for_restraint(name=name, base=base, tautomer=tautomer, pdb_path=pdb_path)
+    atom_1, atom_2, atom_3, angle = get_atoms_for_restraint(tautomer=tautomer, pdb_path=pdb_path)
     
     angle_force = HarmonicAngleForce()
     angle_force.addAngle(particle1=atom_1, 
@@ -305,7 +264,6 @@ def get_angle_restraint(name:str,
         angle_force.setUsesPeriodicBoundaryConditions(True)
     print(f"Restraining the angle defined by atoms {atom_1+1}, {atom_2+1} and {atom_3+1} ({np.degrees(angle):.2f} degrees) with a harmonic angle restraint (with a harmonic force constant of {k} kcal/mole/rad^2)")
     return angle_force
-
 
 # adapted from https://github.com/wiederm/endstate_correction/blob/63b92ab2b25bd4272fa11c956663f7f70f81a11c/endstate_correction/equ.py
 def _collect_equ_samples(
@@ -392,16 +350,11 @@ def calculate_u_kn(
     bond_restr_constant: float,
     angle_restr_constant: float,
     nnp: str,
-    implementation: str,
-    name: str,
-    base: str,
     lambda_scheme,
     platform,
     device,
-    #device_index,
-    #box_info,
     ensemble: str,
-    pdb_path: str,
+    pdb_path_vacuum: str,
     precision: str,
     every_nth_frame: int = 1,  # prune the samples further by taking only every nth sample
 ) -> np.ndarray:
@@ -454,10 +407,7 @@ def calculate_u_kn(
         print("Getting energies for every sample with potential energy function of lambda = {:.2f}".format(lamb))
         sim = get_sim(solv_system=solv_system, 
                       environment=environment,
-                      name=name, 
-                      base=base,
                       nnp=nnp, 
-                      implementation=implementation,
                       lambda_val=lamb, 
                       device=device,
                       platform=platform,
@@ -467,9 +417,8 @@ def calculate_u_kn(
                       angle_restraints=angle_restraints,
                       bond_restr_constant=bond_restr_constant,
                       angle_restr_constant=angle_restr_constant,
-                      pdb_path=pdb_path,
+                      pdb_path_vacuum=pdb_path_vacuum,
                       precision=precision,
-                      #device_index=device_index
                       )
         us = []
         #print("len samples in calculate u_s:", len(samples))
@@ -508,7 +457,6 @@ def compute_dG_flat_bottom_restraint(base:str,
                                      lambda_val:str,
                                      environment:str,
                                      nnp:str,
-                                     implementation:str,
                                      device:str,
                                      every_nth_frame:int,
                                      platform:str,
@@ -518,8 +466,6 @@ def compute_dG_flat_bottom_restraint(base:str,
                                      bond_restr_constant:int,
                                     angle_restr_constant:int,
                                     ensemble:str,
-                                    #device_index:str,
-
                                     ):
 
     if lambda_val == 0:
@@ -527,14 +473,14 @@ def compute_dG_flat_bottom_restraint(base:str,
     elif lambda_val == 1:
         tautomer_form = "keto"
     
-    pdb_file_name = f'{base}/{exp}/{run}/{name}/{name}_hybrid_solv.pdb'
-    pdb_file_name_vac = f'{base}/{exp}/{run}/{name}/{name}_hybrid.pdb'
+    pdb_file_name = f'{base}/{exp}/{name}/{run}/{name}_hybrid_solv.pdb'
+    pdb_file_name_vac = f'{base}/{exp}/{name}/{run}/{name}_hybrid.pdb'
 
     solv_system = app.PDBFile(pdb_file_name)
     discard_frames = 200
     trajs = []
     traj = md.load_dcd(
-        f"{base}/{exp}/{run}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
+        f"{base}/{exp}/{name}/{run}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
         top=pdb_file_name
     )
     traj=traj[discard_frames:]
@@ -552,10 +498,7 @@ def compute_dG_flat_bottom_restraint(base:str,
     #simulation object with flat bottom restraint
     sim_endstate_flat_bottom = get_sim(solv_system=solv_system, 
                 environment=environment,
-                name=name,
-                base=f"{base}/{exp}/{run}/{name}/",
                 nnp=nnp, 
-                implementation=implementation,
                 lambda_val=lambda_val, 
                 device=device,
                 platform=platform,
@@ -565,29 +508,23 @@ def compute_dG_flat_bottom_restraint(base:str,
                 bond_restr_constant=bond_restr_constant,
                 angle_restr_constant=angle_restr_constant,
                 ensemble=ensemble,
-
-                pdb_path=pdb_file_name_vac,)
-                #device_index=device_index)
+                pdb_path_vacuum=pdb_file_name_vac,)
 
     print(f"Creating simulation object for {tautomer_form} form without flat-bottom restraint")
     # simulation object without flat bottom restraint
     sim_endstate_no_flat_bottom = get_sim(solv_system=solv_system, 
             environment=environment,
-            name=name,
-            base=f"{base}/{exp}/{run}/{name}/",
             nnp=nnp, 
-            implementation=implementation,
             lambda_val=lambda_val, 
             device=device,
             platform=platform,
             bond_restraints=bond_restraints,
-            flat_bottom_restraints=False, ############################ set flat_bottom restraint to False
+            flat_bottom_restraints=False, #set flat_bottom restraint to False!
             angle_restraints=angle_restraints,
             bond_restr_constant=bond_restr_constant,
             angle_restr_constant=angle_restr_constant,
             ensemble=ensemble,
-            pdb_path=pdb_file_name_vac,)
-            #device_index=device_index)
+            pdb_path_vacuum=pdb_file_name_vac,)
 
     w = 0.0
     ws = []
