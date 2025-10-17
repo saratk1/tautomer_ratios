@@ -17,12 +17,12 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
-import taut_diff
+import tautomer_ratios
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'taut_diff'
+project = 'tautomer_ratios'
 copyright = ("2024, Sara Tkaczyk. Project structure based on the "
              "Computational Molecular Science Python Cookiecutter version 1.1")
 author = 'Sara Tkaczyk'
@@ -117,7 +117,7 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'taut_diffdoc'
+htmlhelp_basename = 'tautomer_ratiosdoc'
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -144,8 +144,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'taut_diff.tex', 'taut_diff Documentation',
-     'taut_diff', 'manual'),
+    (master_doc, 'tautomer_ratios.tex', 'tautomer_ratios Documentation',
+     'tautomer_ratios', 'manual'),
 ]
 
 
@@ -154,7 +154,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'taut_diff', 'taut_diff Documentation',
+    (master_doc, 'tautomer_ratios', 'tautomer_ratios Documentation',
      [author], 1)
 ]
 
@@ -165,8 +165,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'taut_diff', 'taut_diff Documentation',
-     author, 'taut_diff', 'Tautomer ratios in solution',
+    (master_doc, 'tautomer_ratios', 'tautomer_ratios Documentation',
+     author, 'tautomer_ratios', 'Tautomer ratios in solution',
      'Miscellaneous'),
 ]
 
