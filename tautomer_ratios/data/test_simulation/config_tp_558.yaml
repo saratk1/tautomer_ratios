@@ -1,8 +1,8 @@
 exp: "test_simulation"
-base: "/home/stkaczyk/projects/taut_diff/taut_diff/data" #"taut_diff/data/"
+base: "tautomer_ratios/data/"
 sim_control_params:
-  n_samples: 100 #100
-  n_steps_per_sample: 1 # 10
+  n_samples: 10 
+  n_steps_per_sample: 1 
   nnp:  "ani2x" #"mace-off23-small"
   precision: "single"
   ensemble: "npt"
@@ -12,8 +12,8 @@ sim_control_params:
     bond: True
     flat_bottom_bond: True
     angle: True
-    bond_constant: 100 # 100
-    angle_constant: 10 #10
+    bond_constant: 100
+    angle_constant: 10
   overwrite: True
   minimize: False
 analysis:
