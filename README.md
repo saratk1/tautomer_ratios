@@ -5,12 +5,12 @@
 [![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/taut_diff/branch/main/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/taut_diff/branch/main)
 
 
-This package can be used to calculate the free energy difference between two tautomers in solution using a neural network potential (ANI-2x or MACE-OFF23)
+This package can be used to calculate the free energy difference between tautomer pairs in solution using a neural network potential (ANI-2x or MACE-OFF23)
 
 
 ## Installation
 
-It is recommended to set up a new python conda environment with `python=3.12` and installing the packages defined `here <https://github.com/saratk1/tautomer_ratios/blob/main/devtools/conda-envs/test_env.yaml>` using `mamba`.
+It is recommended to set up a new python conda environment with `python=3.12` and installing the packages defined [here](https://github.com/saratk1/tautomer_ratios/blob/main/devtools/conda-envs/test_env.yaml) using `mamba`.
 This package can be installed using:
 `pip install git+https://github.com/saratk1/tautomer_ratios.git`.
 
@@ -83,4 +83,6 @@ Copyright (c) 2024, Sara Tkaczyk
 #### Acknowledgements
  
 Project based on the 
-[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
+[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.<br>
+Code contained in this repository builds on https://github.com/choderalab/neutromeratio.<br>
+Implementations of ANI-2x and MACE-OFF23 were adapted from https://github.com/openmm/openmm-ml.<br>
