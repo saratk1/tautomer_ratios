@@ -17,7 +17,7 @@ This package can be installed using:
 
 ## How to use this package
 
-There are three scripts that should help to use this package; they are located in `taut_diff/scripts`.
+There are three scripts that should help to use this package; they are located in `tautomer_ratios/scripts`.
 
 ### 1. Sampling
 
@@ -28,7 +28,7 @@ Here is an example of a `config_tp_558.yaml` to generate samples for the enol fo
 ```yaml
 
 exp: "test_simulation" # name of the experiment
-base: "taut_diff/data/" # base directory for output files
+base: "tautomer_ratios/data/" # base directory for output files, adjust this path
 sim_control_params:
   n_samples: 1200 # number of samples to generate
   n_steps_per_sample: 1000 # number of steps between each sample
