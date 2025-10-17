@@ -1,6 +1,5 @@
-# first sys.argv is device index, 
-# second specifies the path to the config.yaml file
-# third specifies the run to be analyzed
+# first argument specifies the path to the config.yaml file
+# second specifies the run to be analyzed
 
 import numpy as np
 import yaml
@@ -35,10 +34,13 @@ else:
     runs_analysis = [sys.argv[2]] # if only one run should be analyzed
     run = sys.argv[2]
 
-reweighting = True ###################################################################################
+reweighting = False # if flat bottom harmonic bond restraint was applied during simulation
+perc = 100 # specify how much of the trajectory should be used
+discard_frames = 200 # discard frames from the beginning 
 
 name = config["tautomer_systems"]["name"]
 exp = config["exp"]
+precision = config['sim_control_params']["precision"]
 lambs = config['analysis']['lambda_scheme']
 nnp = config['sim_control_params']['nnp']
 n_samples = config['sim_control_params']['n_samples']
@@ -47,33 +49,26 @@ base = config['base']
 experiment = config['tautomer_systems']['dG']
 ensemble = config['sim_control_params']['ensemble']
 environment = config['sim_control_params']['environment']
-implementation = config['sim_control_params']['implementation']
 bond_restraints = config['sim_control_params']['restraints']['bond']
 flat_bottom_restraints = config['sim_control_params']['restraints']['flat_bottom_bond']
 angle_restraints = config['sim_control_params']['restraints']['angle']
 bond_restr_constant = config['sim_control_params']['restraints']['bond_constant']
 angle_restr_constant = config['sim_control_params']['restraints']['angle_constant']
-control_param = config['sim_control_params']['restraints']['control_param']
 every_nth_frame = config['analysis']['every_nth_frame']
-precision = "single"
-
-perc = 100
-
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 platform = Platform.getPlatformByName("CUDA")  
-#device_index = sys.argv[3]
 
 # create directory for results
-if not os.path.exists(f"{base}/{exp}/{run}/{name}/analysis"):
-    print("Creating directory:", f"{base}/{exp}/{run}/{name}/analysis")
-    os.makedirs(f"{base}/{exp}/{run}/{name}/analysis")
+if not os.path.exists(f"{base}/{exp}/{name}/{run}/analysis"):
+    print("Creating directory:", f"{base}/{exp}/{name}/{run}/analysis")
+    os.makedirs(f"{base}/{exp}/{name}/{run}/analysis")
 
 # load pdb file depending on the environment of the analysed simulation
 if environment == "waterbox":
-    solv_system = app.PDBFile(f'{base}/{exp}/{run}/{name}/{name}_hybrid_solv.pdb') 
+    solv_system = app.PDBFile(f'{base}/{exp}/{name}/{run}/{name}_hybrid_solv.pdb') 
 elif environment == "vacuum":
-    solv_system = app.PDBFile(f'{base}/{exp}/{run}/{name}/{name}_hybrid.pdb')
+    solv_system = app.PDBFile(f'{base}/{exp}/{name}/{run}/{name}_hybrid.pdb')
 
 print("\n")
 print("############################################################")
@@ -84,29 +79,26 @@ print("############################################################ \n")
 # if only one run is analyzed, the list will have the length of the lambda states and each entry will be a list of used samples for each lambda state
 trajs = []
 if environment == "waterbox":
-    pdb_file = f'{base}/{exp}/{run}/{name}/{name}_hybrid_solv.pdb'
+    pdb_file = f'{base}/{exp}/{name}/{run}/{name}_hybrid_solv.pdb'
     # list for collecting box vectors
     #box_info =[]
 elif environment == "vacuum":
-    pdb_file = f'{base}/{exp}/{run}/{name}/{name}_hybrid.pdb'
+    pdb_file = f'{base}/{exp}/{name}/{run}/{name}_hybrid.pdb'
 
-pdb_file_name_vac = f"{base}/{exp}/{run}/{name}/{name}_hybrid.pdb"
+pdb_file_name_vac = f"{base}/{exp}/{name}/{run}/{name}_hybrid.pdb"
 
-#discard_frames=int((n_samples / 100) * 20) # discard first 20%
-discard_frames = 200
 print(f"Will discard {discard_frames} samples from the beginning of the trajectory ...")
-
-print(f"Loading trajectories from {base}/{exp}/{run}/{name}/")
+print(f"Loading trajectories from {base}/{exp}/{name}/{run}/")
 for lambda_val in lambs:
     for run in runs_analysis:
-        print(f"Loading: {base}/{exp}/{run}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd")
+        print(f"Loading: {base}/{exp}/{name}/{run}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd")
         traj_raw = md.load_dcd(
-                f"{base}/{exp}/{run}/{name}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
+                f"{base}/{exp}/{name}/{run}/{name}_samples_{n_samples}_steps_{n_steps_per_sample}_lamb_{lambda_val:.4f}.dcd",
                 top=pdb_file, # also possible to use the tmp.pdb # CHANGED
             )
-        #print(len(traj_raw))
+
         print(f"Discarding {discard_frames} frames from the beginning of the trajectory...")
-        traj = traj_raw[discard_frames:]  # remove first 20%
+        traj = traj_raw[discard_frames:] 
         if perc == 100:
             traj = traj
         else:
@@ -114,19 +106,7 @@ for lambda_val in lambs:
             keep_frames = int(len(traj) * (perc / 100))  # Compute frames to keep
             traj = traj[:keep_frames]
             print(f"length of trajectory at lambda {lambda_val}:", len(traj))
-        #print(len(traj))
-        
-        # consider box information
-        # if environment == "waterbox":
-        #     for i in range(len(traj)):  
-        #         box_info.append(traj.openmm_boxes(i))
-            
-        # elif environment == "vacuum":
-        #     box_info = None
 
-        #print("box_info[0]-----------------------------------", box_info[0])
-        #print("box_info[0][i]--------------------------------", box_info[0][i])
-        #print("*box_info[0][i])------------------------------", *box_info[0][i])
         trajs.append(traj)
         
 print("-------------------------------------------------------------------------------------------------------------------------------------")
@@ -134,7 +114,6 @@ print("Loaded data:")
 print("length of the cumulated trajectory that will be passed to the calculate_u_kn function (should be the number of lambda states loaded): ", len(trajs))
 print(f"length of the first entry in the cumulated trajectory (should be the number of frames per lambda state): ", len(trajs[0]))
 print("-------------------------------------------------------------------------------------------------------------------------------------")
-
 
 N_k, u_kn, total_number_of_samples = calculate_u_kn(
     trajs=trajs,
@@ -146,18 +125,12 @@ N_k, u_kn, total_number_of_samples = calculate_u_kn(
     bond_restr_constant=bond_restr_constant,
     angle_restr_constant=angle_restr_constant,
     nnp=nnp,
-    implementation=implementation,
-    name=name,
-    base=f"{base}/{exp}/{run}/{name}",
     lambda_scheme=lambs,
     platform=platform,
     device=device,
-    #device_index=device_index,
     every_nth_frame=every_nth_frame,
-    #box_info = box_info,
-    pdb_path = pdb_file_name_vac,
+    pdb_path_vacuum = pdb_file_name_vac,
     ensemble=ensemble,
-    control_param=control_param,
     precision=precision
     )
 
@@ -166,8 +139,8 @@ if sys.argv[2] == "runs_analysis":
     np.save(f'{base}/{exp}/u_kn_{len(lambs)}_{total_number_of_samples:.0f}_{name}_nr_runs_{len(runs_analysis)}_{perc}.npy', u_kn)
     np.save(f'{base}/{exp}/N_k_{total_number_of_samples:.0f}_{len(lambs)}_{name}_nr_runs_{len(runs_analysis)}_{perc}.npy', N_k)
 else:
-    np.save(f'{base}/{exp}/{run}/{name}/analysis/u_kn_{len(lambs)}_{total_number_of_samples:.0f}_{name}_nr_runs_{len(runs_analysis)}_{perc}.npy', u_kn)
-    np.save(f'{base}/{exp}/{run}/{name}/analysis/N_k_{total_number_of_samples:.0f}_{len(lambs)}_{name}_nr_runs_{len(runs_analysis)}_{perc}.npy', N_k)
+    np.save(f'{base}/{exp}/{name}/{run}/analysis/u_kn_{len(lambs)}_{total_number_of_samples:.0f}_{name}_nr_runs_{len(runs_analysis)}_{perc}.npy', u_kn)
+    np.save(f'{base}/{exp}/{name}/{run}/analysis/N_k_{total_number_of_samples:.0f}_{len(lambs)}_{name}_nr_runs_{len(runs_analysis)}_{perc}.npy', N_k)
 
 # ######################################################################################## debugging
 # discard_frames=int((n_samples / 100) * 20) # discard first 20%
@@ -184,7 +157,6 @@ else:
 # initialize the MBAR maximum likelihood estimate
 from pymbar import MBAR
 mbar = MBAR(u_kn, N_k)
-#mbar = MBAR(u_kn, N_k, solver_protocol='robust')
 r = mbar.compute_free_energy_differences()["Delta_f"][0][-1]
 
 from taut_diff.constant import kBT
@@ -212,7 +184,6 @@ if reweighting:
                                     lambda_val=0,
                                     environment=environment,
                                     nnp=nnp,
-                                    implementation=implementation,
                                     device=device,
                                     every_nth_frame=every_nth_frame,
                                     platform=platform,
@@ -221,9 +192,7 @@ if reweighting:
                                     angle_restraints=angle_restraints,
                                     bond_restr_constant=bond_restr_constant,
                                     angle_restr_constant=angle_restr_constant,
-                                    ensemble=ensemble,
-                                    control_param=control_param)
-                                    #device_index=device_index) 
+                                    ensemble=ensemble)
 
     dG_C, dE_C = compute_dG_flat_bottom_restraint(base=base,
                                     exp=exp,
@@ -234,7 +203,6 @@ if reweighting:
                                     lambda_val=1,
                                     environment=environment,
                                     nnp=nnp,
-                                    implementation=implementation,
                                     device=device,
                                     every_nth_frame=every_nth_frame,
                                     platform=platform,
@@ -243,17 +211,15 @@ if reweighting:
                                     angle_restraints=angle_restraints,
                                     bond_restr_constant=bond_restr_constant,
                                     angle_restr_constant=angle_restr_constant,
-                                    ensemble=ensemble,
-                                    control_param=control_param,)
-                                   #device_index=device_index,) 
+                                    ensemble=ensemble)
 
     reweighted_dG = dG_A + dG + dG_C
 
     # save as a compressed NumPy file
-    # print(f"Saving dG corrections to {base}/{exp}/{run}/{name}/analysis/dG_restraints.npz")
-    # np.savez(f'{base}/{exp}/{run}/{name}/analysis/dG_restraints.npz', dG_A=dG_A, dG_C=dG_C)
-    print(f"Saving dG and dE corrections to {base}/{exp}/{run}/{name}/analysis/dG_restraints_{perc}.npz")
-    np.savez(f'{base}/{exp}/{run}/{name}/analysis/dG_restraints_{perc}.npz', 
+    # print(f"Saving dG corrections to {base}/{exp}/{name}/{run}/analysis/dG_restraints.npz")
+    # np.savez(f'{base}/{exp}/{name}/{run}/analysis/dG_restraints.npz', dG_A=dG_A, dG_C=dG_C)
+    print(f"Saving dG and dE corrections to {base}/{exp}/{name}/{run}/analysis/dG_restraints_{perc}.npz")
+    np.savez(f'{base}/{exp}/{name}/{run}/analysis/dG_restraints_{perc}.npz', 
          dG_A=dG_A, dG_C=dG_C, 
          dE_A=dE_A, dE_C=dE_C)
 
@@ -272,7 +238,6 @@ if reweighting:
     import seaborn as sns
     import matplotlib.pyplot as plt
 
-    # Plot KDE distributions
     fontsize=18
     plt.figure(figsize=(10, 6))
     sns.kdeplot(dE_A, label=r'$\Delta$ E(enol_no_restr,enol_restr)', color='blue', fill=True, alpha=0.5)
@@ -287,7 +252,7 @@ if reweighting:
     plt.xticks(fontsize=fontsize)
     plt.yticks(fontsize=fontsize)
 
-    path_save = f"{base}/{exp}/analysis/{name}_dE_reweighting_kde_{run}_{perc}.png"
+    path_save = f"{base}/{exp}/{name}/{run}/analysis/{name}_dE_reweighting_kde_{run}_{perc}.png"
     print(f"Saving KDE plot to {path_save}")
     plt.savefig(path_save)
     plt.close()
